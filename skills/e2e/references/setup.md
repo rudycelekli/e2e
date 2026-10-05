@@ -63,7 +63,8 @@ key, or a local endpoint. Authenticate:
 Switching an existing config to ChatGPT: install `ai` and `@ai-sdk/openai`,
 set `model: chatgpt('gpt-6-luna')` from `e2e/oauth/chatgpt`, run `npx e2e
 login openai`. `npx e2e models` lists the ids each login serves. Use API keys
-in CI.
+in CI. `E2E_OAUTH_CREDENTIALS` is read-only; unset it before signing in.
+Login refuses that environment store before starting provider authentication.
 
 Switching to Copilot: install `ai`, `@ai-sdk/openai-compatible`, and
 `@ai-sdk/openai`, set `model: copilot('<id>')` from `e2e/oauth/copilot`, run
