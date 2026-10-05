@@ -207,6 +207,9 @@ Coordinates are CSS pixels, for what the tree does not list: `tap({ position:
 `screen.swipe({ direction, momentum? })` swipes the viewport. Prefer a
 locator; a point moves with the layout.
 
+On the browser, cancelled manual pointer drags stop later movements and release
+a pressed mouse, including path swipes and drags addressed by observed nodes.
+
 ### Reads
 
 Reads resolve once, no retry: `textContent()`, `inputValue()`,

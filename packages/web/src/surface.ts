@@ -790,6 +790,7 @@ export class PlaywrightSurface {
         }
         return dispatchLocatorAction(this.requireSession().refs.lookup(ref), action, currentOperation.timeoutMs, (other) =>
           this.requireSession().refs.lookup(other),
+          currentOperation.signal,
         );
       },
       (cause) => classifyActionError(cause, action),

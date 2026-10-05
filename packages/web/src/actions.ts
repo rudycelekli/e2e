@@ -87,6 +87,7 @@ export async function dispatchLocatorAction(
   action: LocatorAction,
   timeout: number,
   lookup: (ref: NodeRef) => ActionTarget,
+  signal?: AbortSignal,
 ): Promise<void> {
   const locator = asActionable(target);
   switch (action.kind) {
@@ -153,7 +154,7 @@ export async function dispatchLocatorAction(
       if (target.kind === 'locator' && other.kind === 'locator') {
         await target.locator.dragTo(other.locator, { timeout });
       } else {
-        await performPointerDrag(target, other, timeout);
+        await performPointerDrag(target, other, timeout, signal);
       }
       return;
     }

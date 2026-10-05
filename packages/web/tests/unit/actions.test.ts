@@ -307,6 +307,18 @@ describe('dispatchPointerAction', () => {
     }
   });
 
+  it.each(['move', 'down'] as const)('stops a fast drag when cancelled during %s', async (cancelAt) => {
+    const { page, calls } = stubPage();
+    const controller = new AbortController();
+    const mouse = page.mouse;
+    const move = mouse.move.bind(mouse);
+    const down = mouse.down.bind(mouse);
+    if (cancelAt === 'move') mouse.move = async (x, y) => { await move(x, y); controller.abort(); };
+    else mouse.down = async () => { await down(); controller.abort(); };
+    await expect(dispatchPointerAction(page, { x: 10, y: 20 }, { kind: 'swipeTo', target: { x: 70, y: 20 } }, controller.signal)).rejects.toThrow();
+    expect(calls).toEqual(cancelAt === 'move' ? ['move 10,20'] : ['move 10,20', 'down', 'up']);
+  });
+
   it('swipes in a direction as a wheel gesture over the point, sized by the viewport', async () => {
     const { page, calls } = stubPage();
     await dispatchPointerAction(page, { x: 10, y: 20 }, { kind: 'swipe', direction: 'down' });

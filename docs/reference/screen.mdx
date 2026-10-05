@@ -189,6 +189,10 @@ a mix of the two shapes, an out-of-range duration, or a coordinate off the
 plane, and `UNSUPPORTED_CAPABILITY` when the engine does not list `swipe` in
 its actions (a direction) or `swipeTo` in its pointer actions (a path).
 
+The browser stops later movements in a manual pointer drag when cancellation
+or its operation deadline arrives, and releases a pressed mouse. This applies
+to path swipes and drags addressed by observed nodes.
+
 ```ts
 await screen.swipe({ direction: 'up', momentum: 'fast' });
 

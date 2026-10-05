@@ -4,6 +4,7 @@ import { setTimeout } from 'node:timers/promises';
 import type { ElementHandle, Locator as PwLocator, Mouse, Page } from 'playwright-core';
 import { EngineError, withinCleanupBudget, type EngineCleanupContext, type Momentum, type ScrollDirection, type ViewportPoint, type ViewportSize } from 'e2e/engine';
 import { ConfigurationError, InfrastructureError, TestError } from 'e2e/engine';
+import { connectionAbort } from './operation-budget.ts';
 
 export const DEFAULT_VIEWPORT = { width: 1280, height: 720 } as const;
 
@@ -112,6 +113,7 @@ export async function performPointerDrag(
   source: ActionTarget,
   destination: ActionTarget,
   timeout: number,
+  signal?: AbortSignal,
 ): Promise<void> {
   // Hover the source first: it auto-waits for actionability and scrolls the
   // source into view, and the gesture starts there, so its position is the one
@@ -163,13 +165,23 @@ export async function performPointerDrag(
       );
     }
   }
+  const checkpoint = (): void => { if (signal?.aborted) throw connectionAbort(signal, 'drag'); };
+  checkpoint();
   await page.mouse.move(start.x, start.y);
+  checkpoint();
   await page.mouse.down();
-  // Two moves: HTML5 drag-and-drop commits on `dragover`, and one move into the
-  // destination does not always produce one.
-  await page.mouse.move(end.x, end.y, { steps: 2 });
-  await page.mouse.move(end.x, end.y);
-  await page.mouse.up();
+  try {
+    checkpoint();
+    // Two moves: HTML5 drag-and-drop commits on `dragover`, and one move into the
+    // destination does not always produce one.
+    await page.mouse.move((start.x + end.x) / 2, (start.y + end.y) / 2);
+    checkpoint();
+    await page.mouse.move(end.x, end.y);
+    checkpoint();
+    await page.mouse.move(end.x, end.y);
+  } finally {
+    await page.mouse.up();
+  }
 }
 
 /** Playwright colorizes call logs; escape codes are noise in reports. */
@@ -424,15 +436,20 @@ export async function performPointDrag(
   const from = nearestPixel(start);
   const to = nearestPixel(end);
   const middle = nearestPixel({ x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 });
+  const checkpoint = (): void => { if (signal?.aborted) throw connectionAbort(signal, 'drag'); };
+  checkpoint();
   await mouse.move(from.x, from.y);
+  checkpoint();
   await mouse.down();
   try {
+    checkpoint();
     if (durationMs !== undefined) {
       const steps = Math.max(2, Math.round(durationMs / 16));
       const startedAt = performance.now();
       for (let step = 1; step <= steps; step += 1) {
         const due = startedAt + (durationMs * step) / steps;
         await setTimeout(Math.max(0, due - performance.now()), undefined, { signal });
+        checkpoint();
         await mouse.move(
           from.x + ((to.x - from.x) * step) / steps,
           from.y + ((to.y - from.y) * step) / steps,
@@ -440,6 +457,7 @@ export async function performPointDrag(
       }
     } else {
       await mouse.move(middle.x, middle.y);
+      checkpoint();
       await mouse.move(to.x, to.y);
     }
   } finally {
