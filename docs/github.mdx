@@ -71,6 +71,8 @@ files. A project
 below the checkout root, such as `packages/e2e-tests`, gets source links under
 that path. The checkout root is the nearest directory holding `.git` inside
 `GITHUB_WORKSPACE`, so `actions/checkout` with a `path` input works too.
+A project outside that workspace adds no checkout prefix, even if its
+directory shares the workspace name.
 
 ## The comment
 

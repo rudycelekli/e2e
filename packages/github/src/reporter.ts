@@ -108,14 +108,16 @@ function commentMarker(run: FinishedRun, context: ActionsContext, key: string | 
  * the workspace bounds the walk and stands in when no `.git` is found.
  */
 function checkoutRoot(workspace: string, projectRoot: string, exists: (file: string) => boolean): string {
-  let dir = projectRoot;
-  while (dir.startsWith(workspace)) {
+  const root = path.resolve(workspace);
+  let dir = path.resolve(projectRoot);
+  const relative = path.relative(root, dir);
+  if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) return root;
+  for (;;) {
     if (exists(path.join(dir, '.git'))) return dir;
-    const parent = path.dirname(dir);
-    if (parent === dir) break;
-    dir = parent;
+    if (dir === root) break;
+    dir = path.dirname(dir);
   }
-  return workspace;
+  return root;
 }
 
 /**

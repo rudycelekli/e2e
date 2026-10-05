@@ -128,7 +128,8 @@ hosted service's video by URL.
 - `github()` from `@e2e-dev/github`: on GitHub Actions, one pull request
   comment per run (edited on rerun) plus the job summary; needs
   `pull-requests: write` and `GITHUB_TOKEN` (or `GH_TOKEN`) in the step's
-  env.
+  env. Source links use the project path within the checkout; a project
+  outside `GITHUB_WORKSPACE` adds no checkout prefix.
 
 ## Exit codes
 

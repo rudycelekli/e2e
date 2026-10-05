@@ -97,6 +97,19 @@ describe('reportRun', () => {
     expect(postedBody(dotted.calls)).toContain('(https://github.com/octo/app/blob/head-sha/..app/tests/shop%20flows/cart.e2e.ts#L9)');
   });
 
+  it('does not use a similarly named sibling checkout as the workspace checkout', async () => {
+    const sibling = deps({ ...actionsEnv, GITHUB_TOKEN: 'ghs', GITHUB_WORKSPACE: '/work/app' }, undefined, ['/work/app-other/.git']);
+    await reportRun({ ...failedRun, projectRoot: '/work/app-other/tests-project' }, signal, {}, sibling.deps);
+    expect(postedBody(sibling.calls)).toContain('(https://github.com/octo/app/blob/head-sha/tests/shop%20flows/cart.e2e.ts#L9)');
+    expect(postedBody(sibling.calls)).not.toContain('/blob/head-sha/tests-project/');
+  });
+
+  it('recognizes the workspace checkout with a trailing separator', async () => {
+    const trailing = deps({ ...actionsEnv, GITHUB_TOKEN: 'ghs', GITHUB_WORKSPACE: '/work/' });
+    await reportRun(failedRun, signal, {}, trailing.deps);
+    expect(postedBody(trailing.calls)).toContain('(https://github.com/octo/app/blob/head-sha/app/tests/shop%20flows/cart.e2e.ts#L9)');
+  });
+
   it('folds a --last-failed rerun into the run it selected from, so the comment shows the whole suite with the recovered test flaky', async () => {
     const d = deps({ ...actionsEnv, GITHUB_TOKEN: 'ghs' });
     const failedAttempt = attempt({ status: 'failed', error: { code: 'ASSERTION_FAILED', message: 'no cart' } });
