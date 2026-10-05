@@ -91,6 +91,9 @@ Resources: `e2e://guide` and `e2e://guide/<topic>` hold this skill.
 
 ## Rules
 
+- Calls in one session run in order. Cancelling a queued call prevents its
+  tool from running later; a tool already running receives the abort signal
+  and must cooperate with cancellation.
 - Record a demo or a bug for a pull request with `start_recording` once the
   screen is set up, and `stop_recording` when the part worth watching is
   over; `close_session` saves one still running. Videos are not masked:

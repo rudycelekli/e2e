@@ -203,6 +203,13 @@ artifacts land under `<output>/artifacts/<target>/sessions/`, its videos under
 `<output>/videos/`. A later `e2e run` clears `<output>/artifacts`; the
 videos stay.
 
+## Cancellation
+
+Calls in one session run in order. If the client cancels a queued call, its
+tool does not run when the preceding call finishes. Cancellation during
+argument validation also prevents execution. A tool that has already started
+receives the request's abort signal and must cooperate with cancellation.
+
 ## Resources
 
 | URI | Content |

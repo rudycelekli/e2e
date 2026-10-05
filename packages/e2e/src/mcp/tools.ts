@@ -176,10 +176,12 @@ export async function invokeTool(
   args: Record<string, unknown>,
   extra: McpToolCallExtra,
 ): Promise<McpToolResult> {
+  extra.signal.throwIfAborted();
   if (tool.execute === undefined) {
     throw new ConfigurationError('UNSUPPORTED_CAPABILITY', `tool "${name}" has no execute function`);
   }
   const input = await validateArgs(name, tool, args);
+  extra.signal.throwIfAborted();
   const options: ToolExecutionOptions<unknown> = {
     toolCallId: `mcp-${Date.now().toString(36)}`,
     messages: [],
