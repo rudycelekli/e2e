@@ -114,8 +114,10 @@ function checkoutRoot(workspace: string, projectRoot: string, exists: (file: str
   if (relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) return root;
   for (;;) {
     if (exists(path.join(dir, '.git'))) return dir;
-    if (dir === root) break;
-    dir = path.dirname(dir);
+    if (path.relative(root, dir) === '') break;
+    const parent = path.dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
   }
   return root;
 }

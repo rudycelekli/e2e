@@ -1,5 +1,6 @@
 /** The reporter end to end against fakes: where it posts, where it writes, and what each row says. */
 
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { reportRun, type ReportDeps } from '../../src/reporter.ts';
 import { actionsEnv, fakeGitHub, json, readEvent } from './fake-github.ts';
@@ -105,9 +106,25 @@ describe('reportRun', () => {
   });
 
   it('recognizes the workspace checkout with a trailing separator', async () => {
-    const trailing = deps({ ...actionsEnv, GITHUB_TOKEN: 'ghs', GITHUB_WORKSPACE: '/work/' });
+    const trailing = deps({ ...actionsEnv, GITHUB_TOKEN: 'ghs', GITHUB_WORKSPACE: '/work//' }, undefined, ['/work/app/.git']);
     await reportRun(failedRun, signal, {}, trailing.deps);
-    expect(postedBody(trailing.calls)).toContain('(https://github.com/octo/app/blob/head-sha/app/tests/shop%20flows/cart.e2e.ts#L9)');
+    expect(postedBody(trailing.calls)).toContain('(https://github.com/octo/app/blob/head-sha/tests/shop%20flows/cart.e2e.ts#L9)');
+  });
+
+  it.runIf(process.platform === 'win32')('stops at a workspace with different Windows casing when no checkout exists', async () => {
+    const windows = deps({ ...actionsEnv, GITHUB_TOKEN: 'ghs', GITHUB_WORKSPACE: 'c:\\work' }, undefined, []);
+    const visited: string[] = [];
+    const checked = {
+      ...windows.deps,
+      exists: (file: string) => {
+        visited.push(file);
+        if (visited.length > 3) throw new Error('checkout discovery escaped the workspace');
+        return false;
+      },
+    };
+    await reportRun({ ...failedRun, projectRoot: 'C:\\Work\\app' }, signal, {}, checked);
+    expect(visited).toEqual([path.join('C:\\Work\\app', '.git'), path.join('C:\\Work', '.git')]);
+    expect(postedBody(windows.calls)).toContain('/blob/head-sha/app/tests/shop%20flows/cart.e2e.ts#L9');
   });
 
   it('folds a --last-failed rerun into the run it selected from, so the comment shows the whole suite with the recovered test flaky', async () => {
