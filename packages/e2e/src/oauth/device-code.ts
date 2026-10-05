@@ -30,7 +30,7 @@ export type DevicePoll<T> =
   | { readonly status: 'expired' };
 
 export interface DeviceFlowOptions<T> {
-  start(): Promise<DeviceAuthorization>;
+  start(signal: AbortSignal | undefined): Promise<DeviceAuthorization>;
   poll(authorization: DeviceAuthorization, signal: AbortSignal | undefined): Promise<DevicePoll<T>>;
   instructions?(authorization: DeviceAuthorization): string;
   readonly callbacks: OAuthLoginCallbacks;
@@ -48,7 +48,15 @@ export async function runDeviceFlow<T>(options: DeviceFlowOptions<T>): Promise<T
   const sleep = options.sleep ?? abortableSleep;
   const now = options.now ?? Date.now;
   const { callbacks } = options;
-  const authorization = await options.start();
+  if (callbacks.signal?.aborted) throw new OAuthError('CANCELLED', 'the login was cancelled');
+  let authorization: DeviceAuthorization;
+  try {
+    authorization = await options.start(callbacks.signal);
+  } catch (cause) {
+    if (callbacks.signal?.aborted) throw new OAuthError('CANCELLED', 'the login was cancelled');
+    throw cause;
+  }
+  if (callbacks.signal?.aborted) throw new OAuthError('CANCELLED', 'the login was cancelled');
   callbacks.onAuth({
     url: authorization.verificationUriComplete ?? authorization.verificationUri,
     userCode: authorization.userCode,
@@ -99,8 +107,8 @@ export function rfc8628Flow(options: Rfc8628Options): Promise<TokenResponse> {
   const { vendor, clientId, callbacks } = options;
   return runDeviceFlow<TokenResponse>({
     callbacks,
-    async start() {
-      const response = await postForm(options.deviceCodeUrl, { client_id: clientId, ...options.request });
+    async start(signal) {
+      const response = await postForm(options.deviceCodeUrl, { client_id: clientId, ...options.request }, signal);
       if (!response.ok) throw new OAuthError('FLOW_FAILED', `${vendor} device login could not start: ${await describeResponse(response)}`);
       const json = (await response.json()) as Record<string, unknown>;
       const { device_code, user_code, verification_uri, verification_uri_complete } = json;
