@@ -22,6 +22,17 @@ export const FIXTURE_PAGES: readonly FixturePage[] = [
     `,
   },
   {
+    name: 'role fallback tokens',
+    html: `
+      <button role="unknown button">Save</button>
+      <button role="unknown widget">Submit</button>
+      <a href="/next" role="unknown button link">Continue</a>
+      <div role="unknown img" aria-label="Chart" style="width:10px;height:10px"></div>
+      <div role="unknown\u00a0button" aria-label="Not a role" style="width:10px;height:10px"></div>
+      <table role="unknown grid"><tr><td>Cell</td></tr></table>
+    `,
+  },
+  {
     name: 'inputs',
     html: `
       <label>Full name <input type="text"></label>
