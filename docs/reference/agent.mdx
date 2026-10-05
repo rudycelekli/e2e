@@ -181,7 +181,11 @@ older images are removed in batches, keeping the newest two.
 On engines with a keyboard, including the browser and device engines, `type`
 and `press` can omit `target` to act on the focused field. `type` inserts at
 the caret; `replace: true` clears first. The browser engine rejects typing
-when no editable field has focus. Device engines also offer `dismiss_keyboard`.
+when no editable field has focus. It checks the actual focused control through
+open and tracked closed shadow roots and iframe documents, so a host around a
+button or readonly field does not authorize typing. A custom widget that opts
+into focus and handles keys still receives them. Device engines also offer
+`dismiss_keyboard`.
 When an action closes an on-screen keyboard, the result says so: on a touch
 screen that tap was often spent on closing it, and the model acts on the
 control again.
