@@ -472,7 +472,7 @@
     "result": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["id", "testId", "kind", "declarationIndex", "titlePath", "file", "source", "targetId", "platform", "status", "attempts"],
+      "required": ["id", "testId", "kind", "declarationIndex", "titlePath", "file", "source", "targetId", "platform", "agent", "status", "attempts"],
       "properties": {
         "id": { "$ref": "#/$defs/sha256" },
         "testId": { "type": "string", "minLength": 1 },

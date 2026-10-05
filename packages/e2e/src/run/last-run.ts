@@ -251,6 +251,9 @@ function isResult(value: unknown): value is ReportResult {
   const skip = result.skip as { cause?: unknown } | undefined;
   return (
     typeof result.id === 'string' &&
+    typeof result.testId === 'string' &&
+    typeof result.targetId === 'string' &&
+    typeof result.agent === 'string' &&
     typeof result.status === 'string' &&
     typeof result.file === 'string' &&
     Array.isArray(result.titlePath) &&

@@ -6,7 +6,7 @@
  */
 
 import { spawnSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -70,6 +70,24 @@ function reportOf(ran: FixtureProject): Report1Document {
 const test = (title: string, body = '') => `import { test } from 'e2e';\ntest('${title}', async ({ app }) => {\n  await app.open();\n  ${body}\n});\n`;
 
 describe('the run command through the CLI', () => {
+  it('rejects a previous result without its agent instead of filtering out the failed test', () => {
+    const { project, exitCode } = cli(
+      { 'e2e.config.ts': fakeConfig(), 'tests/fail.e2e.ts': test('fails', "throw new Error('expected failure');") },
+      ['run'],
+    );
+    expect(exitCode).toBe(1);
+    const file = path.join(project.dir, '.e2e', 'report.json');
+    const previous = JSON.parse(readFileSync(file, 'utf8')) as { run: { results: Record<string, unknown>[] } };
+    delete previous.run.results[0]!['agent'];
+    const malformed = JSON.stringify(previous);
+    writeFileSync(file, malformed);
+    const reran = rerun(project, ['run', '--last-failed', '--pass-with-no-tests']);
+    expect(reran.exitCode).toBe(2);
+    expect(reran.output).toContain('NO_LAST_RUN');
+    expect(reran.output).not.toContain('NO_TESTS');
+    expect(readFileSync(file, 'utf8')).toBe(malformed);
+  });
+
   it('exits 3 when a worker dies under a test', () => {
     const { project, exitCode } = cli(
       { 'e2e.config.ts': fakeConfig(), 'tests/crash.e2e.ts': test('crashes the worker', 'process.exit(7);') },

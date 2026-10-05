@@ -35,6 +35,21 @@ describe.each(schemas)('%s schema', (name) => {
   });
 
   if (name === 'report-v1') {
+    it.each(['testId', 'targetId', 'agent'])('requires a result %s identity, including in carried results', (field) => {
+      for (const carried of [false, true]) {
+        const report = readJson('fixtures', 'report-v1.valid.json') as {
+          run: { results: Record<string, unknown>[]; carried: { results: Record<string, unknown>[] } };
+        };
+        const result = (carried ? report.run.carried.results : report.run.results)[0]!;
+        expect(validate(report)).toBe(true);
+        delete result[field];
+        expect(validate(report)).toBe(false);
+        expect(validate.errors).toEqual(expect.arrayContaining([
+          expect.objectContaining({ keyword: 'required', params: { missingProperty: field } }),
+        ]));
+      }
+    });
+
     it('constrains result tags to distinct names --tag can spell back', () => {
       const report = readJson('fixtures', 'report-v1.valid.json') as { run: { results: { tags?: string[] }[] } };
       const result = report.run.results[0]!;

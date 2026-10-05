@@ -143,6 +143,16 @@ describe('readLastRun and lastFailedIds', () => {
     });
   });
 
+  it.each(['testId', 'targetId', 'agent'])('rejects a result missing its %s identity', async (field) => {
+    const result = { id: 'failed', status: 'failed', [field]: undefined };
+    await expect(readLastRun(reportFile(report([result])))).rejects.toMatchObject({ code: 'NO_LAST_RUN' });
+  });
+
+  it.each(['testId', 'targetId', 'agent'])('rejects a carried result with a non-string %s identity', async (field) => {
+    const result = { id: 'failed', status: 'failed', [field]: 123 };
+    await expect(readLastRun(reportFile(report([], [], { carried: { results: [result] } })))).rejects.toMatchObject({ code: 'NO_LAST_RUN' });
+  });
+
   it('is NO_LAST_RUN when the file is not JSON or not a report-1 document', async () => {
     await expect(readLastRun(reportFile('{'))).rejects.toMatchObject({
       code: 'NO_LAST_RUN',

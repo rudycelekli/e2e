@@ -416,7 +416,7 @@
           },
           "targetId": "web",
           "platform": "web",
-          "agent": "default",
+          "agent": "secondary",
           "repeat": 0,
           "selected": true,
           "status": "passed",

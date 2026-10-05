@@ -261,7 +261,8 @@ export interface ReportResult {
   /**
    * The configured agent the test ran as. A test pinned to several agents,
    * or a run with several `--agent` names, yields one result per agent, each
-   * with its own `id`.
+   * with its own `id`. Required even for the default agent, because reruns
+   * select results by test, target, and agent.
    */
   agent: string;
   /**
