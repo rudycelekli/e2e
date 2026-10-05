@@ -103,6 +103,7 @@ export class DialogRouter {
         }
       }
     } catch (cause) {
+      if (!decided) await dialog.dismiss().catch(() => undefined);
       // A failed assertion or a policy refusal keeps its code; only an
       // unclassified throw is the engine's to name.
       this.latch.latch(

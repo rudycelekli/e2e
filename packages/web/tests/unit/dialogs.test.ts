@@ -102,7 +102,9 @@ describe('DialogRouter', () => {
     router.add(() => {
       throw new Error('handler exploded');
     });
-    await router.dispatch(fakeDialog().dialog);
+    const { dialog, dismiss } = fakeDialog();
+    await router.dispatch(dialog);
+    expect(dismiss).toHaveBeenCalledTimes(1);
     expect(() => router.throwPending()).toThrowError(
       expect.objectContaining({ code: 'ENGINE_FAILURE', message: expect.stringContaining('handler exploded') }),
     );

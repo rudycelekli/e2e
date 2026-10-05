@@ -648,6 +648,10 @@ const file = await browser.waitForDownload(() =>
 );
 ```
 
+A handler that throws before answering has its dialog dismissed so the page
+can continue. Its error fails the next step with its original classification;
+an ordinary error is `ENGINE_FAILURE`.
+
 ### keyboard and mouse
 
 Both namespaces are viewport-level. Prefer `locator.press` and
