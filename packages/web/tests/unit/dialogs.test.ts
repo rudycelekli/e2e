@@ -112,6 +112,26 @@ describe('DialogRouter', () => {
     expect(() => router.throwPending()).not.toThrow();
   });
 
+  it('dismisses a dialog when accepting rejects and leaves it unanswered', async () => {
+    const router = new DialogRouter();
+    const { dialog, accept, dismiss } = fakeDialog();
+    accept.mockRejectedValueOnce(new Error('accept failed'));
+    router.add((native) => native.accept());
+    await router.dispatch(dialog);
+    expect(dismiss).toHaveBeenCalledTimes(1);
+    expect(() => router.throwPending()).toThrowError(expect.objectContaining({ code: 'ENGINE_FAILURE' }));
+  });
+
+  it('accepts a void handler that starts an answer without awaiting it', async () => {
+    const router = new DialogRouter();
+    const { dialog, accept, dismiss } = fakeDialog();
+    router.add((native) => { void native.accept(); });
+    await router.dispatch(dialog);
+    expect(accept).toHaveBeenCalledTimes(1);
+    expect(dismiss).not.toHaveBeenCalled();
+    expect(() => router.throwPending()).not.toThrow();
+  });
+
   it('latches a classified handler failure as it was: an assertion stays ASSERTION_FAILED', async () => {
     const router = new DialogRouter();
     const failure = new TestError('ASSERTION_FAILED', 'expected the other message');

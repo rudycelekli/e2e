@@ -11,12 +11,14 @@ it('dismisses a dialog when its handler throws before deciding', async () => {
     const router = new DialogRouter();
     const failure = new Error('handler exploded');
     router.add(() => { throw failure; });
-    page.on('dialog', (dialog) => { void router.dispatch(dialog); });
+    let dispatched: Promise<void> | undefined;
+    page.on('dialog', (dialog) => { dispatched = router.dispatch(dialog); });
     const result = await Promise.race([
       page.evaluate(() => confirm('Really delete everything?')),
       new Promise<'blocked'>((resolve) => setTimeout(() => resolve('blocked'), 1_000)),
     ]);
     expect(result).toBe(false);
+    await dispatched;
     expect(() => router.throwPending()).toThrowError(expect.objectContaining({
       code: 'ENGINE_FAILURE',
       cause: failure,
