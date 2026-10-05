@@ -99,8 +99,8 @@ export function kernel(options: KernelOptions = {}): BrowserProvider {
       const client = clientFor(request.env);
       const browser = await client.create(
         {
-          timeout_seconds: DEFAULT_TIMEOUT_SECONDS,
           ...params,
+          timeout_seconds: params.timeout_seconds === undefined ? DEFAULT_TIMEOUT_SECONDS : params.timeout_seconds,
           tags: {
             ...params.tags,
             e2e_run: request.runId,
