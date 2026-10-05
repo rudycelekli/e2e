@@ -209,7 +209,7 @@ locator; a point moves with the layout.
 
 ### Reads
 
-Reads resolve once, no retry: `textContent()`, `inputValue()`,
+Reads return the current value without waiting for it to change: `textContent()`, `inputValue()`,
 `getAttribute(name)`, `isVisible()`, `isHidden()`, `isEnabled()`,
 `isDisabled()`, `isChecked()`, `boundingBox()`, `count()`. `all()` gives one
 `nth(i)` locator per current match and `allTextContents()` every match's
@@ -221,6 +221,8 @@ controls by role. `waitFor({ state?: 'attached' | 'detached' | 'visible' | 'hidd
 within `actionTimeout`, else `LOCATOR_NOT_FOUND`. For a value that has to
 settle use `expect`, not a read. Reading a password field's value or
 attributes is `POLICY_DENIED`, as is `toHaveAttribute` on one, negated too.
+An engine's stale-reference race can require resolution again. A direct
+read keeps its original `actionTimeout` deadline through that retry.
 
 ## expect
 
