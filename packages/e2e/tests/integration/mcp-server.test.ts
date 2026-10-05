@@ -115,7 +115,7 @@ interface ToolText {
 
 const CANCEL_CONFIG = `import { defineTool } from 'e2e/agent';
 import { z } from 'zod';
-import { watch } from 'node:fs';
+import { existsSync, watch } from 'node:fs';
 import { writeFile } from 'node:fs/promises';
 import { targets } from './targets.ts';
 
@@ -128,6 +128,8 @@ export default {
         const watcher = watch(directory, (_event, filename) => {
           if (filename === 'queue-release') { watcher.close(); resolve(); }
         });
+        // Cleanup may release the queue before this tool starts watching.
+        if (existsSync(directory + '/queue-release')) { watcher.close(); resolve(); }
       });
       await writeFile(directory + '/queue-started', 'started');
       await released;
@@ -183,6 +185,8 @@ describe('e2e mcp', { timeout: 120_000 }, () => {
       'kiosk.ts': KIOSK,
       'custom.config.ts': CUSTOM_CONFIG,
       'cancel.config.ts': CANCEL_CONFIG,
+      'early-cancel.config.ts': CANCEL_CONFIG.replace('process.env.MCP_CANCEL_DIR!', "process.env.MCP_CANCEL_DIR! + '/early-probe'"),
+      'early-probe/queue-release': 'released before server startup',
     });
     transport = new StdioClientTransport({
       command: process.execPath,
@@ -236,6 +240,7 @@ describe('e2e mcp', { timeout: 120_000 }, () => {
     const opened = await invoke('open_session', { config: 'cancel.config.ts' });
     expect(opened.isError, opened.text).toBe(false);
     const held = call('hold_queue');
+    void held.catch(() => undefined);
     try {
       await vi.waitFor(() => access(path.join(project.dir, 'queue-started')));
       const controller = new AbortController();
@@ -252,9 +257,21 @@ describe('e2e mcp', { timeout: 120_000 }, () => {
       expect((await call('observe')).isError).toBe(false);
       await expect(readFile(path.join(project.dir, 'queue-mutated'), 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
     } finally {
-      await writeFile(path.join(project.dir, 'queue-release'), 'release');
-      await held;
-      await invoke('close_session');
+      await writeFile(path.join(project.dir, 'queue-release'), 'release').catch(() => undefined);
+      await held.catch(() => undefined);
+      await invoke('close_session').catch(() => undefined);
+    }
+  });
+
+  it('releases the queue probe when cleanup wrote its marker before the tool started', async () => {
+    const opened = await invoke('open_session', { config: 'early-cancel.config.ts' });
+    expect(opened.isError, opened.text).toBe(false);
+    try {
+      const held = await client.callTool({ name: 'call', arguments: { tool: 'hold_queue' } }, { timeout: 2_000 });
+      expect(held.isError).toBeFalsy();
+    } finally {
+      await writeFile(path.join(project.dir, 'early-probe', 'queue-release'), 'release').catch(() => undefined);
+      await invoke('close_session').catch(() => undefined);
     }
   });
 
