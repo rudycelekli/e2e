@@ -17,6 +17,31 @@ function logged(log: string[], name: string, value: unknown): FixtureDefinition 
 }
 
 describe('createExtendedFixtures', () => {
+  it('stops abandoned setup before later fixtures or the body, while releasing the late fixture', async () => {
+    const log: string[] = [];
+    let finishSetup!: () => void;
+    const waiting = new Promise<void>((resolve) => { finishSetup = resolve; });
+    const extended = createExtendedFixtures([
+      {
+        name: 'slow',
+        fn: async (_fixtures, use) => {
+          log.push('setup:slow');
+          await waiting;
+          await use('slow');
+          log.push('teardown:slow');
+        },
+      },
+      logged(log, 'later', 'later'),
+    ], {}, 'toy');
+    const continuation = extended.setUp().then(() => { log.push('body'); });
+    const stopped = expect(continuation).rejects.toMatchObject({ code: 'TEST_SETUP_FAILED' });
+    await Promise.resolve();
+    expect(extended.teardowns()).toEqual([]);
+    finishSetup();
+    await stopped;
+    expect(log).toEqual(['setup:slow', 'teardown:slow']);
+  });
+
   it('tears down the fixtures set up before a later one throws, last first, and never the one that threw', async () => {
     const log: string[] = [];
     const fixtures = {};

@@ -54,6 +54,13 @@ export function createExtendedFixtures(
   const active: FixtureState[] = [];
   let abandoned = false;
 
+  /** Stops the setup continuation once teardown has taken ownership of the attempt. */
+  const requireActive = (): void => {
+    if (abandoned) {
+      throw new ConfigurationError('TEST_SETUP_FAILED', 'fixture setup ended after the attempt was abandoned');
+    }
+  };
+
   const setUpOne = async (definition: FixtureDefinition): Promise<void> => {
     const { name } = definition;
     // Own properties only: the base object is a plain object, so `in` would
@@ -130,7 +137,11 @@ export function createExtendedFixtures(
 
   return {
     async setUp(): Promise<void> {
-      for (const definition of definitions) await setUpOne(definition);
+      requireActive();
+      for (const definition of definitions) {
+        await setUpOne(definition);
+        requireActive();
+      }
     },
     teardowns(): readonly FixtureTeardown[] {
       abandoned = true;

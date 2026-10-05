@@ -149,10 +149,16 @@ const test = base.extend<{ slow: string }>({
     await use('slow');
     log('teardown:slow');
   },
+}).extend<{ later: string }>({
+  later: async (_fixtures, use) => {
+    log('unreachable:later');
+    await use('later');
+  },
 });
 
-test('times out in setup', { timeout: 500 }, async ({ slow }) => {
-  log('unreachable:' + slow);
+test.beforeEach(() => log('unreachable:beforeEach'));
+test('times out in setup', { timeout: 500 }, async () => {
+  log('unreachable:body');
 });
 `;
       const logPath = path.join('/tmp', `e2e-extend-late-${Date.now()}.log`);

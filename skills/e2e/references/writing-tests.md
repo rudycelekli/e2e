@@ -67,6 +67,9 @@ wsTest('uses the workspace', async ({ ws }) => {}); // code after use() is teard
 
 A setup test cannot skip from its body (`INVALID_ARGUMENT`).
 
+When a fixture setup times out, a later `use(value)` releases that fixture's
+teardown. It does not start later fixtures, `beforeEach` hooks, or the body.
+
 | Option | Default | Notes |
 | --- | --- | --- |
 | `timeout` | `config.timeout`, 120 s | Covers `beforeEach` and the body. |
