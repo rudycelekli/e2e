@@ -65,7 +65,7 @@ it.each([['point', 'down'], ['observed', 'down'], ['point', 'move'], ['observed'
       ? engine.performAt!({ x: 20, y: 20 }, { kind: 'dragTo', target: { x: 170, y: 20 } }, current)
       : engine.perform!(source.ref, { kind: 'dragTo', target: destination.ref }, current);
     await expect(gesture).rejects.toMatchObject({ code: 'CANCELLED' });
-    await page.waitForFunction(() => document.body.dataset.events?.endsWith('up,') === true);
+    await page.waitForFunction(() => document.body.dataset.events?.endsWith('up,') === true, undefined, { timeout: operation.timeoutMs });
     expect(await page.getAttribute('body', 'data-events')).toBe(cancelAt === 'down' ? 'down,up,' : 'down,move,up,');
   } finally {
     page.off('console', cancel);
