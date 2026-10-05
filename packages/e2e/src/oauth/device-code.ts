@@ -69,7 +69,13 @@ export async function runDeviceFlow<T>(options: DeviceFlowOptions<T>): Promise<T
   let intervalMs = Math.max(positiveSeconds(authorization.interval, DEFAULT_INTERVAL_S) * 1000, MIN_INTERVAL_MS);
   while (now() < deadline) {
     await sleep(Math.min(intervalMs, Math.max(0, deadline - now())), callbacks.signal);
-    const result = await options.poll(authorization, callbacks.signal);
+    let result: DevicePoll<T>;
+    try {
+      result = await options.poll(authorization, callbacks.signal);
+    } catch (cause) {
+      if (callbacks.signal?.aborted) throw new OAuthError('CANCELLED', 'the login was cancelled');
+      throw cause;
+    }
     // A grant that lands after the user cancelled is not a login.
     if (callbacks.signal?.aborted) throw new OAuthError('CANCELLED', 'the login was cancelled');
     switch (result.status) {

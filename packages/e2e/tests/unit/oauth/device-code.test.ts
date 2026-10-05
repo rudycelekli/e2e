@@ -57,6 +57,16 @@ describe('runDeviceFlow', () => {
     expect(displays).toBe(0);
   });
 
+  it('reports cancellation when an in-flight approval poll rejects', async () => {
+    const controller = new AbortController();
+    await expect(runDeviceFlow({
+      start: async () => authorization,
+      poll: async () => { controller.abort(); throw new DOMException('aborted', 'AbortError'); },
+      sleep: async () => {},
+      callbacks: { onAuth() {}, onPrompt: async () => '', signal: controller.signal },
+    })).rejects.toMatchObject({ code: 'CANCELLED' });
+  });
+
   it('preserves a non-cancellation initial request failure', async () => {
     const failure = new Error('device endpoint failed');
     await expect(runDeviceFlow({
