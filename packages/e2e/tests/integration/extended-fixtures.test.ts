@@ -163,7 +163,13 @@ test('times out in setup', { timeout: 500 }, async () => {
 `;
       const logPath = path.join('/tmp', `e2e-extend-late-${Date.now()}.log`);
       process.env['HOOK_LOG'] = logPath;
-      const { outcome, project } = await runProject({ 'tests/late.e2e.ts': file }, {});
+      const fake = createFakeEngine({
+        observe: async () => {
+          // Keep failure capture in flight until the timed-out fixture reaches use().
+          await new Promise((resolve) => setTimeout(resolve, 800));
+        },
+      });
+      const { outcome, project } = await runProject({ 'tests/late.e2e.ts': file }, { config: engineConfig(fake.engine) });
       const result = resultByTitle(outcome, 'times out in setup');
       expect(result.status).toBe('timed-out');
       expect(result.attempts[0]!.error?.phase).toBe('beforeEach');

@@ -1065,6 +1065,7 @@ export class TargetExecutor implements SerialHost {
         registered.fixtures,
         fixtures,
         this.target.engine?.name ?? 'none',
+        attemptAbort.signal,
       );
 
       /**

@@ -69,6 +69,8 @@ A setup test cannot skip from its body (`INVALID_ARGUMENT`).
 
 When a fixture setup times out, a later `use(value)` releases that fixture's
 teardown. It does not start later fixtures, `beforeEach` hooks, or the body.
+This applies while failure evidence is still being captured; fixtures
+provided before the timeout remain available to `afterEach` cleanup.
 
 | Option | Default | Notes |
 | --- | --- | --- |
