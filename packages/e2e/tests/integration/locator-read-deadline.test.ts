@@ -5,6 +5,7 @@ import { resultByTitle, runProjectWithConfigFile } from '../helpers/run-project.
 
 const CONFIG = `import { defineEngine, EngineError, withTimeout, type OperationContext, type LocatorExpression } from 'e2e/engine';
 import { web } from '@e2e-dev/web';
+import { writeFile } from 'node:fs/promises';
 let calls = 0;
 let release!: () => void;
 const pairReady = new Promise<void>(resolve => { release = resolve; });
@@ -20,6 +21,7 @@ Object.defineProperty(wrapped, 'locate', { value: async (expression: LocatorExpr
       if (call === 2) setTimeout(release, 260);
       await pairReady;
     } else {
+      await writeFile('read-retry-budget', String(operation.timeoutMs));
       await new Promise(resolve => setTimeout(resolve, 260));
     }
     return nodes.map(node => ({ ...node, ref: { ...node.ref, id: 'shared-heading' } }));
@@ -35,6 +37,7 @@ export default {
 `;
 
 const SUITE = `import { test, expect } from 'e2e';
+import { readFile } from 'node:fs/promises';
 test('bounds stale direct read retries by one action timeout', async ({ screen, app }) => {
   await app.open('/');
   const node = screen.getByRole('button', 'Increment');
@@ -44,6 +47,9 @@ test('bounds stale direct read retries by one action timeout', async ({ screen, 
   const result = await reading.then(value => ({ value }), error => ({ error: error.code }));
   await ignored;
   console.log('read-result', JSON.stringify(result), 'elapsed', Date.now() - started);
+  const retryBudget = Number(await readFile('read-retry-budget', 'utf8'));
+  expect(retryBudget).toBeGreaterThan(0);
+  expect(retryBudget).toBeLessThan(400);
   expect(result).toEqual({ error: 'ACTION_FAILED' });
 });
 `;
