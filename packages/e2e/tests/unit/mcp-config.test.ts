@@ -58,9 +58,10 @@ describe('planMcpRegistration', () => {
   it('repairs a stale launch command without dropping environment or client settings', () => {
     writeFileSync(path.join(dir, '.mcp.json'), JSON.stringify({
       mcpServers: { e2e: { command: 'e2e', args: ['mcp'], env: { APP_ENV: 'staging' }, timeout: 30_000 } },
+      other: true,
     }));
     const [plan] = planMcpRegistration(dir, ['.mcp.json']);
-    expect(JSON.parse(plan!.content)).toEqual({ mcpServers: { e2e: { ...ENTRY, env: { APP_ENV: 'staging' }, timeout: 30_000 } } });
+    expect(JSON.parse(plan!.content)).toEqual({ mcpServers: { e2e: { ...ENTRY, env: { APP_ENV: 'staging' }, timeout: 30_000 } }, other: true });
   });
 
   it('refuses to overwrite a file that is not JSON', () => {
