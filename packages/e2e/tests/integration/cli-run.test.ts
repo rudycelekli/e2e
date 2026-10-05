@@ -70,7 +70,7 @@ function reportOf(ran: FixtureProject): Report1Document {
 const test = (title: string, body = '') => `import { test } from 'e2e';\ntest('${title}', async ({ app }) => {\n  await app.open();\n  ${body}\n});\n`;
 
 describe('the run command through the CLI', () => {
-  it('rejects a previous result without its agent instead of filtering out the failed test', () => {
+  it.each([undefined, ''])('rejects a previous result with invalid agent %s instead of filtering out the failed test', (agent) => {
     const { project, exitCode } = cli(
       { 'e2e.config.ts': fakeConfig(), 'tests/fail.e2e.ts': test('fails', "throw new Error('expected failure');") },
       ['run'],
@@ -78,7 +78,7 @@ describe('the run command through the CLI', () => {
     expect(exitCode).toBe(1);
     const file = path.join(project.dir, '.e2e', 'report.json');
     const previous = JSON.parse(readFileSync(file, 'utf8')) as { run: { results: Record<string, unknown>[] } };
-    delete previous.run.results[0]!['agent'];
+    previous.run.results[0]!['agent'] = agent;
     const malformed = JSON.stringify(previous);
     writeFileSync(file, malformed);
     const reran = rerun(project, ['run', '--last-failed', '--pass-with-no-tests']);
