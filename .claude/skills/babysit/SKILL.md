@@ -10,6 +10,12 @@ can clear. You own that gap. The end state is the `Ready for Human Review`
 label on a head that is green, conflict-free, and has no unhandled review
 thread. You never merge and never approve.
 
+Fork workflow runs may await maintainer approval without appearing in the
+PR's check rollup. The status snapshot reads those runs for the current
+head and lists them in `workflowApprovals`; ask the maintainer to approve
+the linked runs. Until then the verdict is `ACTION`, even if the visible
+checks are green. Never apply the readiness label while approval is pending.
+
 ## Status
 
 ```bash

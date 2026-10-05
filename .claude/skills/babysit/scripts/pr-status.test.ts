@@ -236,3 +236,41 @@ test('a comment or review by a deleted account still counts', () => {
   });
   assert.deepEqual(status.blockers, ['comments:1', 'changes-requested:2']);
 });
+
+/** A workflow run that needs owner approval and has no PR check yet. */
+function workflowRun(overrides: Partial<NonNullable<Input['workflowRuns']>[number]> = {}): NonNullable<Input['workflowRuns']>[number] {
+  return { id: 10, workflow_id: 1, name: 'spec', event: 'pull_request', head_sha: 'abc123', pull_requests: [], status: 'completed', conclusion: 'action_required', html_url: 'https://github.com/tester-army/e2e/actions/runs/10', ...overrides };
+}
+
+test('fork workflow approval is ACTION even when every reported check is green', () => {
+  const status = summarize({ now: later, pr: pr(), threads: [], comments: [], workflowRuns: [workflowRun()] });
+  assert.equal(status.verdict, 'ACTION');
+  assert.deepEqual(status.blockers, ['workflow-approval:spec']);
+  assert.deepEqual(status.workflowApprovals, [{ name: 'spec', link: 'https://github.com/tester-army/e2e/actions/runs/10' }]);
+});
+
+test('workflow approval on an older head or another event does not block the PR', () => {
+  const status = summarize({ now: later, pr: pr(), threads: [], comments: [], workflowRuns: [workflowRun({ head_sha: 'old-head' }), workflowRun({ id: 11, event: 'push' })] });
+  assert.equal(status.verdict, 'READY');
+  assert.deepEqual(status.workflowApprovals, []);
+});
+
+test('a newer workflow run replaces an old approval requirement regardless of response order', () => {
+  for (const runs of [[workflowRun(), workflowRun({ id: 11, conclusion: 'success' })], [workflowRun({ id: 11, conclusion: 'success' }), workflowRun()]]) {
+    const status = summarize({ now: later, pr: pr(), threads: [], comments: [], workflowRuns: runs });
+    assert.equal(status.verdict, 'READY');
+    assert.deepEqual(status.workflowApprovals, []);
+  }
+});
+
+test('another PR on the same commit cannot replace this PR pending approval', () => {
+  const status = summarize({ now: later, pr: pr(), threads: [], comments: [], workflowRuns: [workflowRun(), workflowRun({ id: 11, conclusion: 'success', pull_requests: [{ number: 8 }] })] });
+  assert.equal(status.verdict, 'ACTION');
+  assert.deepEqual(status.blockers, ['workflow-approval:spec']);
+});
+
+test('a workflow explicitly associated with another PR does not block this PR', () => {
+  const status = summarize({ now: later, pr: pr(), threads: [], comments: [], workflowRuns: [workflowRun({ pull_requests: [{ number: 8 }] })] });
+  assert.equal(status.verdict, 'READY');
+  assert.deepEqual(status.workflowApprovals, []);
+});

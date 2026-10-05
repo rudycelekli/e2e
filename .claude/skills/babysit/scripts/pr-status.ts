@@ -44,6 +44,19 @@ interface PullRequest {
   statusCheckRollup?: Check[] | null;
 }
 
+/** A fork workflow awaiting approval may have no CheckRun in the PR rollup. */
+interface WorkflowRun {
+  id: number;
+  workflow_id: number;
+  name: string;
+  event: string;
+  head_sha: string;
+  pull_requests: { number: number }[];
+  status: string;
+  conclusion: string | null;
+  html_url: string;
+}
+
 interface ThreadComment {
   databaseId?: number;
   author: { login: string } | null;
@@ -94,6 +107,7 @@ interface SummaryInput {
   threads: Thread[];
   comments: IssueComment[];
   reviews?: Review[];
+  workflowRuns?: WorkflowRun[];
   viewer?: string;
   now?: number;
 }
@@ -109,7 +123,7 @@ const SETTLE_MS = 120_000;
 const VERDICTS = new Set(['APPROVED', 'CHANGES_REQUESTED', 'DISMISSED']);
 
 /** Reduces raw GitHub data to blockers, pending work, and a verdict: READY, WAITING, ACTION, or CLOSED. */
-export function summarize({ pr, threads, comments, reviews = [], viewer, now = Date.now() }: SummaryInput) {
+export function summarize({ pr, threads, comments, reviews = [], workflowRuns = [], viewer, now = Date.now() }: SummaryInput) {
   const rollup = pr.statusCheckRollup ?? [];
   const failing: { name: string | undefined; link: string | null }[] = [];
   const pending: (string | undefined)[] = [];
@@ -160,9 +174,25 @@ export function summarize({ pr, threads, comments, reviews = [], viewer, now = D
       url: comment.html_url,
       body: comment.body.slice(0, 600),
     }));
+  // Only the latest run for each workflow on this PR's current head counts;
+  // a rerun replaces a blocked or failed attempt, and older commits cannot
+  // hold the current head back.
+  const latestRuns = new Map<number, WorkflowRun>();
+  for (const run of workflowRuns) {
+    if (run.event !== 'pull_request' || run.head_sha !== pr.headRefOid) continue;
+    // Unapproved fork runs can have no association yet. A named association
+    // to another PR, however, cannot replace this PR's approval requirement.
+    if (run.pull_requests.length > 0 && !run.pull_requests.some((pull) => pull.number === pr.number)) continue;
+    const latest = latestRuns.get(run.workflow_id);
+    if (latest === undefined || run.id > latest.id) latestRuns.set(run.workflow_id, run);
+  }
+  const workflowApprovals = [...latestRuns.values()]
+    .filter((run) => run.conclusion === 'action_required')
+    .map((run) => ({ name: run.name, link: run.html_url }));
   const blockers: string[] = [];
   if (pr.mergeable === 'CONFLICTING') blockers.push('conflict');
   if (pr.isDraft) blockers.push('draft');
+  if (workflowApprovals.length > 0) blockers.push(`workflow-approval:${workflowApprovals.map((run) => run.name).join(',')}`);
   if (failing.length > 0) blockers.push(`failing:${failing.map((check) => check.name).join(',')}`);
   if (open.length > 0) blockers.push(`threads:${open.length}`);
   if (unacknowledged.length > 0) blockers.push(`comments:${unacknowledged.length}`);
@@ -197,6 +227,7 @@ export function summarize({ pr, threads, comments, reviews = [], viewer, now = D
     headPushedAt,
     base: pr.baseRefName,
     checks: { failing, pending },
+    workflowApprovals,
     threads: open,
     escalated: unresolved.filter((thread) => thread.escalated),
     comments: unacknowledged,
@@ -288,7 +319,12 @@ function fetchStatus(selector: string | null) {
       gh(['api', '--paginate', '--slurp', `repos/${owner}/${repo}/pulls/${pr.number}/reviews?per_page=100`]),
     ) as Review[][]
   ).flat();
-  return summarize({ pr, threads, comments, reviews, viewer });
+  const workflowRuns = (
+    JSON.parse(
+      gh(['api', '--paginate', '--slurp', `repos/${owner}/${repo}/actions/runs?event=pull_request&head_sha=${pr.headRefOid}&per_page=100`]),
+    ) as { workflow_runs: WorkflowRun[] }[]
+  ).flatMap((page) => page.workflow_runs);
+  return summarize({ pr, threads, comments, reviews, workflowRuns, viewer });
 }
 
 /** A positive number of seconds for `flag`, or an error naming it. */
