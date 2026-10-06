@@ -533,7 +533,7 @@ describe('isNodeVisible', () => {
 describe('LocatorEngine retries a cross-realm driver failure', () => {
   it('retries a foreign retryable resolve failure', async () => {
     const { engine, calls } = makeEngine({ resolve: ['foreign-stale', () => [REF]] });
-    await expect(engine.resolveForRead(EXPRESSION)).resolves.toEqual(REF);
+    await expect(engine.resolveForRead(EXPRESSION, engine.deadline())).resolves.toEqual(REF);
     expect(calls.resolve).toBe(2);
   });
 
