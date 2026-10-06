@@ -23,7 +23,10 @@ export function pageFunctionSource(fn: (...args: never[]) => unknown): string {
     try {
       parse(ordinary);
       expression = ordinary;
-    } catch {
+    } catch (cause) {
+      if (!/^async\b/.test(source)) {
+        throw new TestError('EVALUATE_FAILED', 'page function cannot be serialized', { cause });
+      }
       expression = `async function ${source.slice('async'.length)}`;
     }
     try {

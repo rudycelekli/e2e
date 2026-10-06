@@ -56,6 +56,12 @@ test.describe('browser fixture', { requires: ['browser'], tags: ['browser'] }, (
     expect(await browser.evaluate(unusual.withTab, 4)).toBe(6);
     expect(await browser.evaluate(unusual.withComment, 4)).toBe(7);
     expect(await browser.evaluate(functions.async)).toBe('ordinary');
+    const getter = Object.getOwnPropertyDescriptor({ get value() { return 1; } }, 'value')!.get!;
+    for (const unsupported of [getter, functions.title.bind(null)]) {
+      let failure: { code?: string } | undefined;
+      try { await browser.evaluate(unsupported); } catch (cause) { failure = cause as { code?: string }; }
+      expect(failure?.code).toBe('EVALUATE_FAILED');
+    }
   });
 
   test('an init script accepts a method with an argument', async ({ browser, screen }) => {
