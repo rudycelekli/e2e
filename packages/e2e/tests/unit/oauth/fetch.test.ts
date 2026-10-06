@@ -70,7 +70,7 @@ describe('createOAuthFetch', () => {
     controller.abort();
     await new Promise(resolve => setImmediate(resolve));
     try {
-      expect(cancelled).toMatchObject({ name: 'AbortError' });
+      expect(cancelled).toBe(controller.signal.reason);
       expect(api.requests).toEqual([]);
     } finally {
       release({ access: 'fresh', refresh: 'rotated', expires: Date.now() + 3_600_000 });
