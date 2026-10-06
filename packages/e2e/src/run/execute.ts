@@ -1096,9 +1096,12 @@ export class TargetExecutor implements SerialHost {
         try {
           phase = 'beforeEach';
           await extended.setUp();
+          attemptAbort.signal.throwIfAborted();
           for (const hook of beforeEachHooks) {
             await hook.fn(fixtures);
+            attemptAbort.signal.throwIfAborted();
           }
+          attemptAbort.signal.throwIfAborted();
           phase = 'body';
           await (registered.fn as SetupFn)(fixtures);
         } catch (cause) {

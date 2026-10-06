@@ -183,4 +183,48 @@ test('times out in setup', { timeout: 500 }, async () => {
     },
     120_000,
   );
+
+  it('does not run later hooks or the body after a beforeEach times out', async () => {
+    const events: string[] = [];
+    const record = (entry: string) => { events.push(entry); };
+    process.on('e2e-late-hook-progress', record);
+    let finishHook: () => void = () => undefined;
+    const hookFinished = new Promise<void>((resolve) => { finishHook = resolve; });
+    process.once('e2e-late-hook-finished', finishHook);
+    const file = `import { test } from 'e2e';
+
+test.beforeEach(async () => {
+  process.emit('e2e-late-hook-progress', 'started');
+  await new Promise<void>((resolve) => process.once('e2e-late-hook-release', resolve));
+  process.emit('e2e-late-hook-progress', 'finished');
+  process.emit('e2e-late-hook-finished');
+});
+test.beforeEach(() => process.emit('e2e-late-hook-progress', 'later hook'));
+test('times out in hook', { timeout: 100 }, async () => {
+  process.emit('e2e-late-hook-progress', 'body');
+});
+`;
+    const fake = createFakeEngine({
+      observe: async () => {
+        process.emit('e2e-late-hook-release');
+        await hookFinished;
+        await new Promise<void>((resolve) => setImmediate(resolve));
+      },
+    });
+    try {
+      const { outcome, project } = await runProject({ 'tests/late-hook.e2e.ts': file }, { config: engineConfig(fake.engine) });
+      try {
+        const result = resultByTitle(outcome, 'times out in hook');
+        expect(result.status).toBe('timed-out');
+        expect(result.attempts[0]!.error?.phase).toBe('beforeEach');
+        expect(events).toEqual(['started', 'finished']);
+      } finally {
+        project.cleanup();
+      }
+    } finally {
+      process.off('e2e-late-hook-progress', record);
+      process.off('e2e-late-hook-finished', finishHook);
+    }
+  });
+
 });
