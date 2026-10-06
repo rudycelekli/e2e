@@ -115,9 +115,6 @@ The tools, one per engine action. Name the target as the screen names it
   menu, context menu only.
 - `hover`: menus, flyouts, tooltips that open on the pointer.
 - `type`: one input; on browser/device no target means focus; `replace` clears.
-  The browser checks the focused leaf through shadow roots and iframe documents,
-  refusing buttons and readonly fields before dispatch. Focused custom widgets
-  that handle keys remain supported.
 - `press`: one key to a node or, on browser/device, to focus; `times` up to 20.
 - `select`: one option by visible label.
 - `check`: set a checkbox, switch, or radio to a state, not flip it.
