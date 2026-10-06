@@ -456,6 +456,9 @@ roots, and the agent sees their content. Actions and assertions work there
 as anywhere else. `first`, `last`, and `nth` count matches outside a closed
 root first, then each root's matches in order.
 
+Headers and footers inside a shadow root retain the surrounding article or
+section's scope; they are not reported as page landmarks.
+
 ```ts
 // The input and the button live in a closed shadow root a widget attached.
 await screen.getByPlaceholder('Access code').fill('SHADOW-42');
