@@ -397,8 +397,11 @@ export class ManagedProcess {
       () => 'exited' as const,
     );
     const groupExited = (async () => {
-      await Promise.race([exited, sleep(25, timer.signal)]);
-      while (processGroupRunning(child)) await sleep(25, timer.signal);
+      while (processGroupRunning(child)) {
+        const poll = sleep(25, timer.signal);
+        // Leader exit wakes each wait; surviving descendants keep the polling cadence.
+        await (child.exitCode === null && child.signalCode === null ? Promise.race([exited, poll]) : poll);
+      }
     })().catch(() => undefined);
     const winner = await Promise.race([groupExited.then(() => 'exited' as const), timedOut]);
     timer.abort();

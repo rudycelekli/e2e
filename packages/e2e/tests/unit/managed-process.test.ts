@@ -253,6 +253,41 @@ describe('ManagedProcess stall diagnostics', () => {
     expect((failure as InfrastructureError).message).toContain('did not exit within 10000 ms');
   });
 
+  it.skipIf(process.platform === 'win32')('wakes shutdown on leader exit after fake timers are restored', async () => {
+    const reservation = await alreadyRunning();
+    const url = reservation.url;
+    await reservation.close();
+    const release = path.join(dir, 'release-exit');
+    const pid = path.join(dir, 'leader.pid');
+    const script = `
+      const fs = require('node:fs');
+      require('node:http').createServer((req, res) => res.end('ready')).listen(${new URL(url).port}, '127.0.0.1');
+      process.on('SIGTERM', () => setInterval(() => {
+        if (fs.existsSync(${JSON.stringify(release)})) process.exit(0);
+      }, 10));
+      fs.writeFileSync(${JSON.stringify(pid)}, String(process.pid));
+    `;
+    const app = new ManagedProcess('app.command', {
+      executable: process.execPath,
+      args: ['-e', script],
+      shutdownTimeout: 1_000,
+    }, dir, { readyUrl: url });
+    try {
+      await app.start();
+      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
+      const stopping = app.stop();
+      await vi.advanceTimersByTimeAsync(100);
+      vi.useRealTimers();
+      fs.writeFileSync(release, 'exit');
+      await stopping;
+    } finally {
+      vi.useRealTimers();
+      fs.writeFileSync(release, 'exit');
+      await app.stop();
+      try { process.kill(Number(fs.readFileSync(pid, 'utf8')), 'SIGKILL'); } catch { /* already exited */ }
+    }
+  }, 5_000);
+
   it('names the URL it waits for on a readyUrl command', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
     const notices: string[] = [];
