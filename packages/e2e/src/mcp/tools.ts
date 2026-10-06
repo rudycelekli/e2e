@@ -19,7 +19,7 @@ import type { JSONSchema7, Tool, ToolExecutionOptions, ToolSet } from 'ai';
 import type { z } from 'zod';
 import { loadAiSdk, loadAiSdkIfInstalled, loadedAiSdk } from '../agent/ai-sdk.ts';
 import { isFailedResult } from '../agent/loop-guards.ts';
-import { codedMessage, ConfigurationError, errorMessage } from '../internal/errors.ts';
+import { codedMessage, ConfigurationError, errorMessage, InfrastructureError } from '../internal/errors.ts';
 import { describeIssue } from '../internal/standard-schema.ts';
 import type { StandardSchemaV1 } from '../types.ts';
 
