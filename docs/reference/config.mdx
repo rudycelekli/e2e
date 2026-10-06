@@ -352,6 +352,9 @@ with the port. Tests read the allocated URL from
 
 ### command
 
+On POSIX, shutdown waits for the command's whole process group, including
+children that remain after the command itself exits.
+
 ```ts
 export interface CommandConfig {
   /** Resolved with `PATH`; never shell-interpreted. */
