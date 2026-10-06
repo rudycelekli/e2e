@@ -15,10 +15,8 @@ describe('logout', () => {
   });
 });
 
-
-afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
-
 describe('login', () => {
+  afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
   const credentials = { access: 'local-test', refresh: 'local-refresh', expires: 0 };
   const callbacks = { onAuth: vi.fn(), onPrompt: async () => '' };
 
