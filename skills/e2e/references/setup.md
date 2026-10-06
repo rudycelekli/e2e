@@ -327,9 +327,7 @@ export default {
   from the app config's `extra.eas.projectId` (`projectId` overrides), reads
   `EXPO_TOKEN`, else the `eas login` session, needs no Xcode or Android SDK, and with `buildId` EAS installs
   the app (omit `app.appPath`). A run must fit one session: `maxDurationMinutes`,
-  absent, is the account's cap (40 on a standard plan). Duration and idle
-  minute limits must be non-negative integers; zero idle omits the idle limit.
-  `videoTouches: false`
+  absent, is the account's cap (40 on a standard plan). `videoTouches: false`
   on the engine for video there.
 - Only a control that appeared or moved with the previous action waits out
   `transition` (default 500 ms); agent actions settle `settle` ms (default
