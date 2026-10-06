@@ -32,7 +32,11 @@ describe('ManagedProcess', () => {
     const pending = app.start(controller.signal);
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      await probeStarted;
+      await Promise.race([
+        probeStarted,
+        new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error(`no ${phase} probe was issued`)), 2_000); }),
+      ]);
+      clearTimeout(timer);
       controller.abort();
       const completed = await Promise.race([
         pending.then(() => true),
