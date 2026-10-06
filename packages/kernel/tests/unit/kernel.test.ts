@@ -123,7 +123,7 @@ describe('kernel()', () => {
   });
 
   it('keeps the idle timeout backstop for an undefined option from a JavaScript config', async () => {
-    const provider = Reflect.apply(kernel, undefined, [{ timeout_seconds: undefined }]);
+    const provider = kernel({ timeout_seconds: undefined } as unknown as Parameters<typeof kernel>[0]);
     await provider.acquire(request());
     expect(sdk.state.created[0]?.body).toHaveProperty('timeout_seconds', 600);
   });

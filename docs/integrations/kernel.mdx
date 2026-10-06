@@ -150,8 +150,7 @@ attempt's artifacts, in both scopes.
   running.
 - Defaults `timeout_seconds` to 600, the backstop for a run that dies
   itself before it can delete its browsers: Kernel deletes an idle browser
-  after that long. Omitting the option or passing `undefined` from a
-  JavaScript config keeps this default. Pass a number to change it.
+  after that long. Pass your own to change it.
 - Logs `browser <id>, watch at <live view URL>` to the reporter as each
   browser is created: at the start of the run in `worker` scope, and from
   the worker for each attempt's browser in `attempt` scope and for a

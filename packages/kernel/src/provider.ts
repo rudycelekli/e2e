@@ -100,7 +100,7 @@ export function kernel(options: KernelOptions = {}): BrowserProvider {
       const browser = await client.create(
         {
           ...params,
-          timeout_seconds: params.timeout_seconds === undefined ? DEFAULT_TIMEOUT_SECONDS : params.timeout_seconds,
+          timeout_seconds: params.timeout_seconds ?? DEFAULT_TIMEOUT_SECONDS,
           tags: {
             ...params.tags,
             e2e_run: request.runId,
