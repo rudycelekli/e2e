@@ -231,12 +231,19 @@ export class SessionStore {
    * Validates identity and expiry, then decrypts one session state. A
    * session is immutable for the life of the run that produced it, so the
    * decrypted state is memoized per store: a worker running many consumers
-   * of one session reads and decrypts its file once.
+   * of one session reads and decrypts its file once. Its expiry is still
+   * checked on every load: an immutable state can expire between consumers.
    */
   async load(name: string, identity: SessionIdentity): Promise<SavedSession> {
     const memoKey = `${identity.targetId}\u0000${name}`;
     const cached = this.loaded.get(memoKey);
-    if (cached !== undefined) return cached;
+    if (cached !== undefined) {
+      const saved = await cached;
+      if (saved.state.expiresAt !== undefined && Date.parse(saved.state.expiresAt) <= Date.now()) {
+        throw new ConfigurationError('SESSION_EXPIRED', `session "${name}" is expired`);
+      }
+      return saved;
+    }
     const loading = this.loadUncached(name, identity);
     this.loaded.set(memoKey, loading);
     try {

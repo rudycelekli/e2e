@@ -314,6 +314,9 @@ test('the dashboard opens directly', { session: 'admin' }, async ({ app, screen 
   match `[A-Za-z0-9_.-]{1,128}`.
 - A session holds cookies, local storage, and IndexedDB for one run,
   encrypted and deleted at cleanup; server state is not part of it.
+- Sessions expire after at most 24 hours, or sooner when the engine declares
+  a state lifetime. Every restore checks expiry, including later tests using
+  the same worker (`SESSION_EXPIRED`).
 - Once a secret is filled, model pixels and assertion screenshots are
   withheld for the rest of that session (later serial members included) and
   `app.screenshot()` is `POLICY_DENIED`. A restored session keeps its setup's

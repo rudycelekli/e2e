@@ -984,6 +984,10 @@ Use these helpers to keep behavior consistent across engines:
 
 ## State
 
+An engine may declare a snapshot lifetime with `expiresAt`. The runner checks
+that lifetime before every session restore, including when the worker has
+already loaded the same session for an earlier test.
+
 ```ts
 /**
  * An opaque, restorable snapshot of an engine's state. `data` is JSON the
