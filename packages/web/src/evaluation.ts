@@ -9,6 +9,27 @@ type EvaluationResult =
 /** The `__name` helper tsx's `keepNames` output calls, declared beside test code serialized into the page. */
 export const KEEP_NAMES_HELPER = "const __name = (target, value) => Object.defineProperty(target, 'name', { value, configurable: true });";
 
+/** A function expression for page code, including ordinary and async method shorthand. Never runs it here. */
+export function pageFunctionSource(fn: (...args: never[]) => unknown): string {
+  const source = fn.toString().trim();
+  const parse = (text: string) => new Function(`return (${text}\n);`);
+  try {
+    parse(source);
+    return source;
+  } catch {
+    // Method toString() omits the function keyword; an arrow or function expression already parsed above.
+    const expression = source.startsWith('async ')
+      ? `async function ${source.slice('async '.length)}`
+      : `function ${source}`;
+    try {
+      parse(expression);
+      return expression;
+    } catch (cause) {
+      throw new TestError('EVALUATE_FAILED', 'page function cannot be serialized', { cause });
+    }
+  }
+}
+
 /**
  * Compiles the page-side error boundary without evaluating the caller's source in this process.
  * The source is one expression: a function it evaluates to is called with the argument, any

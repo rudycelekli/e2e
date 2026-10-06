@@ -40,6 +40,22 @@ test.describe('browser fixture', { requires: ['browser'], tags: ['browser'] }, (
     await expect(screen.getByLabel('Random')).toHaveText('random: seeded');
   });
 
+  test('evaluate accepts methods with arguments and asynchronous results', async ({ browser }) => {
+    const functions = {
+      title() { return document.title; },
+      async add(value: number) { return value + 1; },
+    };
+    expect(await browser.evaluate(functions.title)).toBe('Browser');
+    expect(await browser.evaluate(functions.add, 4)).toBe(5);
+  });
+
+  test('an init script accepts a method with an argument', async ({ browser, screen }) => {
+    const functions = { seed(value: number) { Math.random = () => value; } };
+    await browser.addInitScript(functions.seed, 0.5);
+    await browser.reload();
+    await expect(screen.getByLabel('Random')).toHaveText('random: seeded');
+  });
+
   test('the viewport size is what the page measures', async ({ screen, browser }) => {
     await browser.setViewport({ width: 500, height: 700 });
     await expect(screen.getByLabel('Viewport')).toHaveText('500x700');
