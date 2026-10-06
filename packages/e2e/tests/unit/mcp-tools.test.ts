@@ -53,7 +53,7 @@ describe('invokeTool', () => {
   it('does not run a tool whose request was cancelled while queued', async () => {
     const execute = vi.fn(async () => 'never');
     const reason = new Error('cancelled before dispatch');
-    await expect(invokeTool('tap', { ...tap, execute }, { target: 'n4' }, { signal: AbortSignal.abort(reason) })).rejects.toBe(reason);
+    await expect(invokeTool('tap', { ...tap, execute }, { target: 'n4' }, { signal: AbortSignal.abort(reason) })).rejects.toMatchObject({ code: 'CANCELLED' });
     expect(execute).not.toHaveBeenCalled();
   });
 
@@ -64,7 +64,7 @@ describe('invokeTool', () => {
     const inputSchema = z.object({ target: z.string() }).superRefine(async () => {
       controller.abort(reason);
     });
-    await expect(invokeTool('tap', { ...tap, inputSchema, execute }, { target: 'n4' }, { signal: controller.signal })).rejects.toBe(reason);
+    await expect(invokeTool('tap', { ...tap, inputSchema, execute }, { target: 'n4' }, { signal: controller.signal })).rejects.toMatchObject({ code: 'CANCELLED' });
     expect(execute).not.toHaveBeenCalled();
   });
 

@@ -522,7 +522,7 @@ describe('SessionHost', { timeout: 60_000 }, () => {
       await first.catch(() => undefined);
       await counted.close('done', id);
     }
-    expect(summaries[0]).toMatchObject({ projectToolCalls: 2, failedCalls: 1, errorCodes: new Map([['ERROR', 1]]) });
+    expect(summaries[0]).toMatchObject({ projectToolCalls: 2, failedCalls: 1, errorCodes: new Map([['CANCELLED', 1]]) });
   });
 
   it('reports one summary per open: its calls by tool, its failures by code, and how it ended', async () => {
