@@ -18,9 +18,14 @@ export function pageFunctionSource(fn: (...args: never[]) => unknown): string {
     return source;
   } catch {
     // Method toString() omits the function keyword; an arrow or function expression already parsed above.
-    const expression = source.startsWith('async ')
-      ? `async function ${source.slice('async '.length)}`
-      : `function ${source}`;
+    const ordinary = `function ${source}`;
+    let expression: string;
+    try {
+      parse(ordinary);
+      expression = ordinary;
+    } catch {
+      expression = `async function ${source.slice('async'.length)}`;
+    }
     try {
       parse(expression);
       return expression;

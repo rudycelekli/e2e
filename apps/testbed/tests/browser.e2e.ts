@@ -44,9 +44,18 @@ test.describe('browser fixture', { requires: ['browser'], tags: ['browser'] }, (
     const functions = {
       title() { return document.title; },
       async add(value: number) { return value + 1; },
+      async() { return 'ordinary'; },
+    };
+    // Preserve the method's original trivia rather than the TypeScript printer's whitespace.
+    const unusual = new Function('return ({ async\twithTab(value) { return value + 2; }, async/**/withComment(value) { return value + 3; } })')() as {
+      withTab(value: number): Promise<number>;
+      withComment(value: number): Promise<number>;
     };
     expect(await browser.evaluate(functions.title)).toBe('Browser');
     expect(await browser.evaluate(functions.add, 4)).toBe(5);
+    expect(await browser.evaluate(unusual.withTab, 4)).toBe(6);
+    expect(await browser.evaluate(unusual.withComment, 4)).toBe(7);
+    expect(await browser.evaluate(functions.async)).toBe('ordinary');
   });
 
   test('an init script accepts a method with an argument', async ({ browser, screen }) => {
