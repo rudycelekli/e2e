@@ -213,7 +213,7 @@ export class LocatorEngine {
   }
 
   /** Immediate single resolve for direct reads: zero or multiple matches fail immediately. */
-  async resolveForRead(expression: LocatorExpression, deadline = this.deadline(this.options.actionTimeout)): Promise<NodeRef> {
+  async resolveForRead(expression: LocatorExpression, deadline: Deadline): Promise<NodeRef> {
     const ref = assertSingle(await this.resolveOnce(expression, deadline), expression);
     if (ref === null) {
       throw new TestError('LOCATOR_NOT_FOUND', `locator matched no nodes: ${describeExpression(expression)}`, {
