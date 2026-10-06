@@ -648,9 +648,7 @@ const file = await browser.waitForDownload(() =>
 );
 ```
 
-A handler that throws before answering has its dialog dismissed so the page
-can continue. Its error fails the next step with its original classification;
-an ordinary error is `ENGINE_FAILURE`.
+A handler that throws before answering has its dialog dismissed, and its error fails the next step.
 
 ### keyboard and mouse
 
