@@ -48,15 +48,15 @@ export async function runDeviceFlow<T>(options: DeviceFlowOptions<T>): Promise<T
   const sleep = options.sleep ?? abortableSleep;
   const now = options.now ?? Date.now;
   const { callbacks } = options;
-  if (callbacks.signal?.aborted) throw new OAuthError('CANCELLED', 'the login was cancelled');
+  throwIfCancelled(callbacks.signal);
   let authorization: DeviceAuthorization;
   try {
     authorization = await options.start(callbacks.signal);
   } catch (cause) {
-    if (callbacks.signal?.aborted) throw new OAuthError('CANCELLED', 'the login was cancelled');
+    throwIfCancelled(callbacks.signal);
     throw cause;
   }
-  if (callbacks.signal?.aborted) throw new OAuthError('CANCELLED', 'the login was cancelled');
+  throwIfCancelled(callbacks.signal);
   callbacks.onAuth({
     url: authorization.verificationUriComplete ?? authorization.verificationUri,
     userCode: authorization.userCode,
@@ -73,11 +73,11 @@ export async function runDeviceFlow<T>(options: DeviceFlowOptions<T>): Promise<T
     try {
       result = await options.poll(authorization, callbacks.signal);
     } catch (cause) {
-      if (callbacks.signal?.aborted) throw new OAuthError('CANCELLED', 'the login was cancelled');
+      throwIfCancelled(callbacks.signal);
       throw cause;
     }
     // A grant that lands after the user cancelled is not a login.
-    if (callbacks.signal?.aborted) throw new OAuthError('CANCELLED', 'the login was cancelled');
+    throwIfCancelled(callbacks.signal);
     switch (result.status) {
       case 'granted':
         return result.value;
@@ -96,6 +96,11 @@ export async function runDeviceFlow<T>(options: DeviceFlowOptions<T>): Promise<T
     }
   }
   throw new OAuthError('TIMEOUT', 'the device code expired before the login finished; run the login again');
+}
+
+/** Keeps interrupted device requests and late grants under the login cancellation code. */
+function throwIfCancelled(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) throw new OAuthError('CANCELLED', 'the login was cancelled');
 }
 
 export interface Rfc8628Options {
