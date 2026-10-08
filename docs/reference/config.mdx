@@ -391,8 +391,7 @@ The child inherits only `PATH`, `HOME`, the temp-directory variables, and
 `command.env`, so pass what the app needs explicitly. Every `args` entry and
 `env` value is a string; anything else, a number or a `secrets.get()` handle
 included, is `INVALID_CONFIG`, except an `undefined` `env` value, which is
-dropped. The runner never terminates a process it did not start. An interrupt
-also cancels an in-flight readiness HTTP probe, before or after spawning.
+dropped. The runner never terminates a process it did not start.
 
 ### services
 
