@@ -426,8 +426,7 @@ a closed root; the [browser guide](/browser#shadow-dom) has the details.
 The function runs in the page and cannot access variables from the test.
 It is serialized by its source and inlined into the page, so it must not
 close over anything outside its own body; helpers declared inside the body
-work. Ordinary and async methods passed as functions also work. Pass outside
-values through `arg`. Both `arg` and the return value
+work. Pass outside values through `arg`. Both `arg` and the return value
 must be `JsonValue`, otherwise the call fails with `INVALID_ARGUMENT`.
 
 A string is evaluated as a single expression, not as statements. If it
@@ -454,8 +453,7 @@ tab and frame. `web({ initScripts })` applies to every test;
 `browser.addInitScript` adds one for the rest of the test.
 
 A script is JavaScript source, a `{ path }` relative to the project root, or a
-function, including ordinary and async method shorthand. A function cannot close
-over test variables; pass a JSON `arg`
+function. A function cannot close over test variables; pass a JSON `arg`
 instead.
 
 ```ts
