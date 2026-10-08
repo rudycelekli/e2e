@@ -226,5 +226,4 @@ test('times out in hook', { timeout: 100 }, async () => {
       process.off('e2e-late-hook-finished', finishHook);
     }
   });
-
 });

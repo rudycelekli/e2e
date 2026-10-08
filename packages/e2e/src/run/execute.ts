@@ -1077,7 +1077,6 @@ export class TargetExecutor implements SerialHost {
             await hook.fn(fixtures);
             attemptAbort.signal.throwIfAborted();
           }
-          attemptAbort.signal.throwIfAborted();
           enter('body');
           await (registered.fn as SetupFn)(fixtures);
         } catch (cause) {
