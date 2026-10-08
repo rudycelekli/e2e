@@ -5,7 +5,7 @@ import path from 'node:path';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { Page } from 'playwright-core';
 import { PlaywrightSurface } from '../../src/surface.ts';
-import { noSecrets } from '../helpers/secrets.ts';
+import { ignoreTrace, noSecrets } from '../helpers/secrets.ts';
 
 const surface = new PlaywrightSurface({});
 const signal = new AbortController().signal;
@@ -17,7 +17,7 @@ let page: Page;
 beforeAll(async () => {
   artifactsDir = mkdtempSync(path.join(tmpdir(), 'e2e-keyboard-shadow-'));
   await surface.init({ runId: 'focus', targetName: 'web', projectRoot: process.cwd(), app: {}, env: {}, headed: false, workerSlot: 0, signal, log: () => undefined });
-  await surface.startAttempt({ attemptId: 'focus-1', artifactsDir, signal, resolveSecret: noSecrets });
+  await surface.startAttempt({ attemptId: 'focus-1', artifactsDir, signal, resolveSecret: noSecrets, ...ignoreTrace });
   await surface.open('about:blank', operation());
   page = surface.requirePage();
 });
