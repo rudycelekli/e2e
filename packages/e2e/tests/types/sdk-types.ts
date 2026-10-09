@@ -63,10 +63,14 @@ import { isDefinedTool } from '../../src/agent/public.ts';
 import { createAgent } from '../../src/agent/public.ts';
 // @ts-expect-error BLOCKABLE_CODES left e2e: a blocked verdict carries any code the errors reference marks blocked
 import { BLOCKABLE_CODES } from '../../src/index.ts';
+// @ts-expect-error list is e2e/runner: importing e2e does not load the runner
+import { list as listFromE2E } from '../../src/index.ts';
+import { ConfigurationError, isE2EError, list, type ListedPair, type ListOptions } from '../../src/runner.ts';
 
 isDefinedTool;
 createAgent;
 BLOCKABLE_CODES;
+listFromE2E;
 
 declare const agent: Agent;
 declare const appFixture: App;
@@ -148,6 +152,17 @@ attemptContext.resolveSecret(secrets.get('key')) satisfies Promise<string>;
 void attemptContext.resolveSecret(secrets.get('key'), { derived: (plaintext) => [Buffer.from(`ada:${plaintext}`).toString('base64')] });
 // @ts-expect-error a derived form is a string computed from the value, never the handle itself.
 void attemptContext.resolveSecret(secrets.get('key'), { derived: () => [secrets.get('key')] });
+// An engine reports what the app logged, one line from a closed source and level each.
+attemptContext.appLog({ source: 'network', level: 'error', text: 'GET /api/todos 500' });
+// @ts-expect-error an app log source is a closed union.
+attemptContext.appLog({ source: 'stdout', level: 'error', text: 'boom' });
+// @ts-expect-error where the app went is its own report, not an app log line.
+attemptContext.appLog({ source: 'navigation', level: 'info', text: 'navigated to /login' });
+attemptContext.navigation('navigated to /login');
+declare const actCache: NonNullable<Awaited<ReturnType<Agent['act']>>['cache']>;
+actCache.entry satisfies string | undefined;
+// @ts-expect-error what became of the recording is known once the attempt ends, so only the report has it.
+void actCache.write;
 credentials.user('admin').password satisfies Secret;
 ({ targets, credentials: { admin: { username: 'admin', password: () => 'admin-pass' } } }) satisfies E2EConfig;
 // @ts-expect-error only password may be a provider function; username is a plain string.
@@ -300,6 +315,17 @@ void expect.poll(() => 'x').toBe(1);
 void expect.poll('x').toBe('x');
 // @ts-expect-error the synchronous matchers take no options; a value that is still settling goes through expect.poll
 expect('x').toBe('x', { timeout: 1000 });
+// expect(screen) and expect(locator) compare screenshots; screen gets no locator matcher.
+void (expect(screen).toHaveScreenshot('home.png') satisfies Promise<void>);
+void (expect(screen).not.toHaveScreenshot({ maxDiffPixelRatio: 0.01, mask: [screen.getByTestId('clock')] }) satisfies Promise<void>);
+void (expect(screen.getByRole('button')).toHaveScreenshot({ threshold: 0.1, maxDiffPixels: 10, maskColor: '#000000', timeout: 1000 }) satisfies Promise<void>);
+void (expect.soft(screen).toHaveScreenshot() satisfies Promise<void>);
+// @ts-expect-error a page screenshot option the cross-platform matcher does not take
+void expect(screen).toHaveScreenshot({ fullPage: true });
+// @ts-expect-error masks are locators, not selectors
+void expect(screen).toHaveScreenshot({ mask: ['#clock'] });
+// @ts-expect-error screen is not a locator
+void expect(screen).toBeVisible();
 screen.getByRole('button', { name: 'Save', visible: true });
 screen.getByRole('heading', { name: 'Dashboard', level: 1 });
 // The vocabulary names composite widgets and structure, and takes ARIA's img as an alias of image.
@@ -576,3 +602,17 @@ describe('group', { tags: ['smoke'] }, () => {
 describe('async group', async () => {});
 // @ts-expect-error a suite hook sees suite fixtures only
 beforeAll((fixtures) => void fixtures.screen);
+
+// `e2e/runner` lists a selection in process. `config` is a path or a config value; `grep` is RegExp[].
+void list({
+  cwd: '.', config: 'e2e.config.ts', files: ['tests/a.e2e.ts'], tags: ['smoke'], tagMode: 'all', excludeTags: ['slow'],
+  grep: [/^plain$/], grepInvert: [/other/], lastFailed: false, shard: { index: 1, total: 2 }, passWithNoTests: true,
+  output: 'out', env: {}, targets: ['web'],
+} satisfies ListOptions);
+void list({ config: { targets } });
+void isE2EError(new ConfigurationError('NO_TESTS', 'none'));
+// @ts-expect-error grep is an array of RegExp, not strings
+void list({ grep: ['plain'] });
+// @ts-expect-error disposition is run, skip, or filtered
+const disposition: ListedPair['disposition'] = 'pending';
+void disposition;
