@@ -1151,6 +1151,7 @@ function validateRunOptions(options: SelectionRunOptions): void {
   positiveInt(options.repeatEach, 'repeatEach');
   const shard = options.shard;
   if (shard !== undefined && (
+    shard === null ||
     !Number.isSafeInteger(shard.index) || shard.index <= 0 ||
     !Number.isSafeInteger(shard.total) || shard.total <= 0 ||
     shard.index > shard.total
