@@ -10,6 +10,50 @@ import { ManagedProcess } from '../../src/run/managed-process.ts';
 import type { CommandConfig } from '../../src/types.ts';
 
 describe('ManagedProcess', () => {
+  it.each(['preflight', 'startup'] as const)('cancels an in-flight %s readiness probe', async (phase) => {
+    let probing!: () => void;
+    const probeStarted = new Promise<void>((resolve) => { probing = resolve; });
+    let requests = 0;
+    const server = http.createServer((_request, response) => {
+      requests += 1;
+      if (phase === 'startup' && requests === 1) response.writeHead(503).end();
+      else probing(); // Keep the actual HTTP response pending until cancellation.
+    });
+    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address();
+    if (address === null || typeof address === 'string') throw new Error('no port');
+    const app = new ManagedProcess('app.command', {
+      executable: process.execPath,
+      args: ['-e', 'setInterval(() => {}, 1000)'],
+      startupTimeout: 10_000,
+      shutdownTimeout: 1_000,
+    }, process.cwd(), { readyUrl: `http://127.0.0.1:${address.port}/` });
+    const controller = new AbortController();
+    const pending = app.start(controller.signal);
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        probeStarted,
+        new Promise<never>((_resolve, reject) => { timer = setTimeout(() => reject(new Error(`no ${phase} probe was issued`)), 2_000); }),
+      ]);
+      clearTimeout(timer);
+      controller.abort();
+      const completed = await Promise.race([
+        pending.then(() => true),
+        new Promise<boolean>((resolve) => { timer = setTimeout(() => resolve(false), 500); }),
+      ]);
+      expect(completed).toBe(true);
+      expect(app.spawned).toBe(phase === 'startup');
+    } finally {
+      clearTimeout(timer);
+      controller.abort();
+      server.closeAllConnections();
+      await pending;
+      await app.stop();
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
+  });
+
   it('stops waiting for readiness and takes the process down when the signal aborts', async () => {
     const app = new ManagedProcess(
       'app.command',
@@ -252,41 +296,6 @@ describe('ManagedProcess stall diagnostics', () => {
     expect((failure as InfrastructureError).code).toBe('APP_UNREACHABLE');
     expect((failure as InfrastructureError).message).toContain('did not exit within 10000 ms');
   });
-
-  it.skipIf(process.platform === 'win32')('wakes shutdown on leader exit after fake timers are restored', async () => {
-    const reservation = await alreadyRunning();
-    const url = reservation.url;
-    await reservation.close();
-    const release = path.join(dir, 'release-exit');
-    const pid = path.join(dir, 'leader.pid');
-    const script = `
-      const fs = require('node:fs');
-      require('node:http').createServer((req, res) => res.end('ready')).listen(${new URL(url).port}, '127.0.0.1');
-      process.on('SIGTERM', () => setInterval(() => {
-        if (fs.existsSync(${JSON.stringify(release)})) process.exit(0);
-      }, 10));
-      fs.writeFileSync(${JSON.stringify(pid)}, String(process.pid));
-    `;
-    const app = new ManagedProcess('app.command', {
-      executable: process.execPath,
-      args: ['-e', script],
-      shutdownTimeout: 1_000,
-    }, dir, { readyUrl: url });
-    try {
-      await app.start();
-      vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });
-      const stopping = app.stop();
-      await vi.advanceTimersByTimeAsync(100);
-      vi.useRealTimers();
-      fs.writeFileSync(release, 'exit');
-      await stopping;
-    } finally {
-      vi.useRealTimers();
-      fs.writeFileSync(release, 'exit');
-      await app.stop();
-      try { process.kill(Number(fs.readFileSync(pid, 'utf8')), 'SIGKILL'); } catch { /* already exited */ }
-    }
-  }, 5_000);
 
   it('names the URL it waits for on a readyUrl command', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] });

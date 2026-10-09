@@ -250,11 +250,11 @@ test('forbidden URL schemes are refused', async ({ app }) => {
 });
 
 test('a route handler assertion that no step follows', async ({ app, browser }) => {
-  await browser.route('**/api/flags', async (route) => {
-    await route.fulfill({ json: { betaBoard: true } });
+  await browser.route('**/api/flags.js', async (route) => {
+    await route.fulfill({ body: '', contentType: 'text/javascript' });
     expect(route.request.method).toBe('POST');
   });
-  await app.open('/flags');
+  await app.open('/script-flags');
 });
 
 test('a dialog handler assertion that no step follows', async ({ app, browser, screen }) => {
@@ -276,11 +276,11 @@ test.afterEach(async ({ app }) => {
 });
 
 test('a route handler assertion that no step follows, then a teardown that navigates', async ({ app, browser }) => {
-  await browser.route('**/api/flags', async (route) => {
-    await route.fulfill({ json: { betaBoard: true } });
+  await browser.route('**/api/flags.js', async (route) => {
+    await route.fulfill({ body: '', contentType: 'text/javascript' });
     expect(route.request.method).toBe('POST');
   });
-  await app.open('/flags');
+  await app.open('/script-flags');
 });
 `;
 
@@ -480,13 +480,7 @@ describe('web platform integration', () => {
     expect(result.status).toBe('failed');
     const error = result.attempts[0]!.error;
     expect(error?.code).toBe('ACTION_FAILED');
-    const timing = /^no download started within (\d+)ms; the trigger resolved after (\d+)ms$/.exec(error?.message ?? '');
-    expect(timing).not.toBeNull();
-    // The operation reports its remaining budget after setup, capped by the requested 500ms.
-    const waitMs = Number(timing?.[1]);
-    expect(waitMs).toBeGreaterThan(0);
-    expect(waitMs).toBeLessThanOrEqual(500);
-    const triggerMs = Number(timing?.[2]);
+    const triggerMs = Number(/^no download started within 500ms; the trigger resolved after (\d+)ms$/.exec(error?.message ?? '')?.[1]);
     // The trigger sleeps 200ms; a timer can fire a millisecond or two early.
     expect(triggerMs).toBeGreaterThanOrEqual(190);
   });
@@ -564,9 +558,9 @@ describe('web platform integration', () => {
     expect(attempt.error).toMatchObject({ code: 'ASSERTION_FAILED', phase: 'body' });
     expect(attempt.steps.map((step) => step.api)).toEqual(['browser.route', 'app.open', 'app.open']);
     const failure = attempt.failure!;
-    expect(failure.url).toMatch(/\/flags$/);
+    expect(failure.url).toMatch(/\/script-flags$/);
     const screen = attempt.artifacts.find((artifact) => artifact.id === failure.screen)!;
-    const text = readFileSync(path.join(project.dir, '.e2e', 'artifacts', screen.path!), 'utf8');
+    const text = readFileSync(path.join(project.dir, '.e2e', 'results', screen.path!), 'utf8');
     expect(text).toContain('heading "Flags"');
     expect(text).not.toContain('heading "Home"');
   });

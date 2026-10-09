@@ -64,7 +64,7 @@ function processGroupRunning(child: ChildProcess): boolean {
 }
 
 /**
- * Kills every process group this module spawned and has not yet seen exit,
+ * Kills every process group this module spawned and has not yet released,
  * synchronously and without waiting: the last resort before the process
  * exits on the spot, so nothing it started outlives it. A reused process was
  * never spawned here and is left alone.
@@ -83,9 +83,10 @@ function describeExit(exit: ExitStatus): string {
 }
 
 /** One readiness probe: true when `url` answers 200 through 499 within `timeoutMs`. */
-async function answers(url: string, timeoutMs: number): Promise<boolean> {
+async function answers(url: string, timeoutMs: number, signal?: AbortSignal): Promise<boolean> {
   try {
-    const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(timeoutMs) });
+    const timeout = AbortSignal.timeout(timeoutMs);
+    const response = await fetch(url, { redirect: 'manual', signal: signal === undefined ? timeout : AbortSignal.any([timeout, signal]) });
     return response.status >= 200 && response.status <= 499;
   } catch {
     return false;
@@ -170,7 +171,7 @@ export class ManagedProcess {
       if (this.command.reuseExisting === true && !reuse) {
         this.hooks.notice?.(`${this.label}: reuseExisting is ignored in CI, starting the command`);
       }
-      if (await answers(readyUrl, Math.min(READY_PROBE_TIMEOUT_MS, startupTimeout))) {
+      if (await answers(readyUrl, Math.min(READY_PROBE_TIMEOUT_MS, startupTimeout), signal)) {
         if (reuse) {
           this.reusedExisting = true;
           this.hooks.notice?.(`${this.label}: reusing the process already serving ${readyUrl}`);
@@ -223,13 +224,6 @@ export class ManagedProcess {
     let exit: ExitStatus | undefined;
     const exited = new Promise<void>((resolve) => {
       child.once('exit', (code, exitSignal) => {
-        // Outside stop(), an exited command can no longer own a background
-        // child. During stop(), keep the group registered until its grace
-        // period completes, even when the leader exits first.
-        if (this.child === child) {
-          signalProcessGroup(child, 'SIGKILL');
-          live.delete(child);
-        }
         exit = { code, signal: exitSignal };
         resolve();
       });
@@ -280,7 +274,7 @@ export class ManagedProcess {
       const untilHalf = noticed ? Number.POSITIVE_INFINITY : Math.max(READY_POLL_MIN_MS, remaining - half);
       if (
         readyUrl !== undefined &&
-        (await answers(readyUrl, Math.min(READY_PROBE_TIMEOUT_MS, remaining, untilHalf)))
+        (await answers(readyUrl, Math.min(READY_PROBE_TIMEOUT_MS, remaining, untilHalf), signal))
       ) {
         return;
       }
