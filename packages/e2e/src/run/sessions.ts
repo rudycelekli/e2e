@@ -239,9 +239,7 @@ export class SessionStore {
     const cached = this.loaded.get(memoKey);
     if (cached !== undefined) {
       const saved = await cached;
-      if (saved.state.expiresAt !== undefined && Date.parse(saved.state.expiresAt) <= Date.now()) {
-        throw new ConfigurationError('SESSION_EXPIRED', `session "${name}" is expired`);
-      }
+      assertSessionNotExpired(name, saved.state.expiresAt);
       return saved;
     }
     const loading = this.loadUncached(name, identity);
@@ -279,9 +277,7 @@ export class SessionStore {
         `session "${name}" does not match the current run/target/engine identity`,
       );
     }
-    if (Date.parse(envelope.expiresAt) <= Date.now()) {
-      throw new ConfigurationError('SESSION_EXPIRED', `session "${name}" is expired`);
-    }
+    assertSessionNotExpired(name, envelope.expiresAt);
 
     const { tag, ciphertext, ...aadState } = envelope.state;
     const aadEnvelope = { ...envelope, state: aadState };
@@ -319,6 +315,13 @@ export class SessionStore {
   /** Deletes the run's session directory. */
   cleanup(): void {
     rmSync(this.directory, { recursive: true, force: true });
+  }
+}
+
+/** Refuses an expired saved session, whether freshly decrypted or already cached. */
+function assertSessionNotExpired(name: string, expiresAt: string | undefined): void {
+  if (expiresAt !== undefined && Date.parse(expiresAt) <= Date.now()) {
+    throw new ConfigurationError('SESSION_EXPIRED', `session "${name}" is expired`);
   }
 }
 

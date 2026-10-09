@@ -134,7 +134,7 @@
               "index",
               "quickstart",
               "core-concepts",
-              "explore"
+              "coding-agents"
             ]
           },
           {
@@ -143,6 +143,16 @@
               "web",
               "mobile",
               "api-testing"
+            ]
+          },
+          {
+            "group": "Features",
+            "pages": [
+              "explore",
+              "visual-testing",
+              "authentication",
+              "bug-bash",
+              "agents"
             ]
           },
           {
@@ -155,20 +165,23 @@
             ]
           },
           {
-            "group": "Automate",
+            "group": "Run in CI",
             "pages": [
-              "coding-agents",
               "ci",
-              "mobile-ci",
+              "ci/github-actions",
+              "ci/eas-workflows",
+              "ci/bitrise",
+              "ci/codemagic",
               "github"
             ]
           },
           {
-            "group": "Integrations",
+            "group": "Hosted browsers and devices",
             "pages": [
               "integrations/index",
               "integrations/kernel",
-              "integrations/eas"
+              "integrations/eas",
+              "integrations/smol"
             ]
           },
           {
@@ -183,12 +196,9 @@
             "group": "Deep dive",
             "pages": [
               "browser",
-              "bug-bash",
-              "authentication",
               "security",
               "telemetry",
               "debugging",
-              "agents",
               "agent-steps"
             ]
           },
@@ -223,6 +233,7 @@
             "pages": [
               "reference/config",
               "reference/cli",
+              "reference/runner",
               "reference/mcp",
               "reference/reporters",
               "reference/environment",
@@ -264,6 +275,10 @@
     }
   },
   "redirects": [
+    {
+      "source": "/mobile-ci",
+      "destination": "/ci#mobile-jobs"
+    },
     {
       "source": "/introduction",
       "destination": "/"
