@@ -40,6 +40,16 @@ describe('Windows stack locations', () => {
     expect(sourceLocation(stack, root)?.file).toBe('tests/login.e2e.ts');
   });
 
+  it.each([
+    [String.raw`\\server\share\project`, 'file://server/share/project/tests/login.e2e.ts'],
+    [String.raw`\\server\share\project folder`, 'file://server/share/project%20folder/tests/login.e2e.ts'],
+  ])('decodes UNC file URLs under %s', (uncRoot, url) => {
+    const uncFile = uncRoot + String.raw`\tests\login.e2e.ts`;
+    const stack = `    at Object.fn (${url}:28:9)`;
+    expect(userFrame(stack, uncRoot)).toEqual({ file: uncFile, line: 28, column: 9 });
+    expect(sourceLocation(stack, uncRoot)).toEqual({ file: 'tests/login.e2e.ts', line: 28, column: 9 });
+  });
+
   it('handles UNC project roots', () => {
     const uncRoot = String.raw`\\server\share\project`;
     const uncFile = uncRoot + String.raw`\tests\login.e2e.ts`;
