@@ -31,7 +31,7 @@ export type DevicePoll<T> =
   | { readonly status: 'expired' };
 
 export interface DeviceFlowOptions<T> {
-  start(): Promise<DeviceAuthorization>;
+  start(signal: AbortSignal | undefined): Promise<DeviceAuthorization>;
   poll(authorization: DeviceAuthorization, signal: AbortSignal | undefined): Promise<DevicePoll<T>>;
   instructions?(authorization: DeviceAuthorization): string;
   readonly callbacks: OAuthLoginCallbacks;
@@ -49,7 +49,15 @@ export async function runDeviceFlow<T>(options: DeviceFlowOptions<T>): Promise<T
   const sleep = options.sleep ?? abortableSleep;
   const now = options.now ?? Date.now;
   const { callbacks } = options;
-  const authorization = await options.start();
+  throwIfCancelled(callbacks.signal);
+  let authorization: DeviceAuthorization;
+  try {
+    authorization = await options.start(callbacks.signal);
+  } catch (cause) {
+    throwIfCancelled(callbacks.signal);
+    throw cause;
+  }
+  throwIfCancelled(callbacks.signal);
   callbacks.onAuth({
     url: authorization.verificationUriComplete ?? authorization.verificationUri,
     userCode: authorization.userCode,
@@ -70,11 +78,14 @@ export async function runDeviceFlow<T>(options: DeviceFlowOptions<T>): Promise<T
     let result: DevicePoll<T>;
     try {
       result = await withAbort(() => options.poll(authorization, signal), expiry.signal, deviceCodeExpired);
+    } catch (cause) {
+      throwIfCancelled(callbacks.signal);
+      throw cause;
     } finally {
       clearTimeout(timer);
     }
     // A grant that lands after the user cancelled is not a login.
-    if (callbacks.signal?.aborted) throw new OAuthError('CANCELLED', 'the login was cancelled');
+    throwIfCancelled(callbacks.signal);
     if (now() >= deadline) throw deviceCodeExpired();
     switch (result.status) {
       case 'granted':
@@ -100,6 +111,11 @@ function deviceCodeExpired(): OAuthError {
   return new OAuthError('TIMEOUT', 'the device code expired before the login finished; run the login again');
 }
 
+/** Keeps interrupted device requests and late grants under the login cancellation code. */
+function throwIfCancelled(signal: AbortSignal | undefined): void {
+  if (signal?.aborted) throw new OAuthError('CANCELLED', 'the login was cancelled');
+}
+
 export interface Rfc8628Options {
   readonly vendor: string;
   readonly deviceCodeUrl: string;
@@ -115,8 +131,8 @@ export function rfc8628Flow(options: Rfc8628Options): Promise<TokenResponse> {
   const { vendor, clientId, callbacks } = options;
   return runDeviceFlow<TokenResponse>({
     callbacks,
-    async start() {
-      const response = await postForm(options.deviceCodeUrl, { client_id: clientId, ...options.request });
+    async start(signal) {
+      const response = await postForm(options.deviceCodeUrl, { client_id: clientId, ...options.request }, signal);
       if (!response.ok) throw new OAuthError('FLOW_FAILED', `${vendor} device login could not start: ${await describeResponse(response)}`);
       const json = (await response.json()) as Record<string, unknown>;
       const { device_code, user_code, verification_uri, verification_uri_complete } = json;
