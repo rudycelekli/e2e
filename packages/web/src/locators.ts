@@ -278,6 +278,12 @@ const DISPLAY_VALUE_COMPOSITION_MESSAGE =
  */
 function project(scope: PwScope, expression: LocatorExpression, testIdAttribute: string): ProjectedLocator {
   switch (expression.kind) {
+    case 'union': {
+      frameSelectors(expression);
+      const left = requireComposable(project(scope, expression.left, testIdAttribute));
+      const right = requireComposable(project(scope, expression.right, testIdAttribute));
+      return { locator: left.or(right), displayValue: null, name: null, composable: null, steps: [], visible: false };
+    }
     case 'query': {
       const inner =
         expression.scope === undefined
@@ -401,6 +407,14 @@ export async function applyPostSteps<T>(
 /** Returns every frame selector along an expression, outermost first. */
 export function frameSelectors(expression: LocatorExpression): string[] {
   switch (expression.kind) {
+    case 'union': {
+      const left = frameSelectors(expression.left);
+      const right = frameSelectors(expression.right);
+      if (left.length !== right.length || left.some((selector, index) => selector !== right[index])) {
+        throw new EngineError('UNSUPPORTED_CAPABILITY', 'locator.or requires both branches in the same document', { retryable: false });
+      }
+      return left;
+    }
     case 'query':
       return expression.scope === undefined ? [] : frameSelectors(expression.scope);
     case 'filter':

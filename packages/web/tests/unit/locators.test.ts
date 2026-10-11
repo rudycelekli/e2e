@@ -276,3 +276,14 @@ describe('applyPostSteps', () => {
     expect(await applyPostSteps(matches, [index('first'), filter], never)).toEqual([]);
   });
 });
+
+describe('portable locator alternatives refusal boundaries', () => {
+  it('refuses a display-value alternative before broadening its candidates', () => {
+    expect(() => projectExpression(page, { kind: 'union', left: shared, right: textbox })).toThrow(expect.objectContaining({ code: 'UNSUPPORTED_CAPABILITY', retryable: false }));
+  });
+  it('refuses alternatives belonging to distinct frame documents', () => {
+    const left: LocatorExpression = { kind: 'query', scope: { kind: 'frame', selector: '#left', source: { kind: 'selector', selector: ':root' } }, query: { kind: 'role', value: { kind: 'string', value: 'button', exact: true } } };
+    const right: LocatorExpression = { kind: 'query', scope: { kind: 'frame', selector: '#right', source: { kind: 'selector', selector: ':root' } }, query: { kind: 'role', value: { kind: 'string', value: 'button', exact: true } } };
+    expect(() => projectExpression(page, { kind: 'union', left, right })).toThrow(expect.objectContaining({ code: 'UNSUPPORTED_CAPABILITY', retryable: false }));
+  });
+});

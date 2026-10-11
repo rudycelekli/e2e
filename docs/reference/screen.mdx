@@ -312,6 +312,8 @@ export interface Locator extends Screen {
   waitFor(options?: { state?: 'attached' | 'detached' | 'visible' | 'hidden'; timeout?: number }): Promise<void>;
   /** Adds deterministic locator filters. */
   filter(options: { hasText?: TextMatch; has?: Locator }): Locator;
+  /** Matches either locator in traversal order, without duplicate nodes. */
+  or(other: Locator): Locator;
   /** Selects the first current match. */
   first(): Locator;
   /** Selects the last current match. */
@@ -437,6 +439,13 @@ await screen.getByTestId('spinner').waitFor({ state: 'hidden' });
 ```
 
 ### Every match at once
+
+`locator.or(other)` matches either locator in traversal order and includes an
+overlapping node once. Both locators must belong to the same attempt and
+target. Actions and single-node assertions retain strict ambiguity when both
+branches match different nodes; use `.first()` only when that choice is intended.
+The web engine requires both branches in the same document and retains its
+existing restriction on display-value queries in native locator compositions.
 
 `all()` resolves the query once and hands back one `nth(i)` locator per
 match, so a loop can act on each row; `allTextContents()` reads every match's

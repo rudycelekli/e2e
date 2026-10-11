@@ -82,6 +82,7 @@ export interface SemanticQuery {
  * device platform); `frame` scopes a query inside one nested document.
  */
 export type LocatorExpression =
+  | { readonly kind: 'union'; readonly left: LocatorExpression; readonly right: LocatorExpression }
   | {
       readonly kind: 'query';
       readonly query: SemanticQuery;

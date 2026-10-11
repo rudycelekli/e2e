@@ -107,3 +107,22 @@ describe('an exact label query composed as a has filter', () => {
     expect(await testIds(byLabel('Last Name', true))).toHaveLength(1);
   });
 });
+
+
+it('combines native queries without duplicate nodes and keeps document order', async () => {
+ const engine=web(); const app=await startFixtureApp();
+ const artifacts=mkdtempSync(path.join(tmpdir(),'e2e-union-')); const op=operation('union');
+ await boot(engine,app);
+ await engine.startAttempt!({attemptId:'union',artifactsDir:artifacts,signal:new AbortController().signal,resolveSecret:noSecrets,...ignoreTrace});
+ try {
+  await engine.session!.open!(`${app.url}/rows`,op);
+  const last={kind:'query',query:{kind:'testId',value:{kind:'string',value:'row-last-name',exact:true}}} as const;
+  const quote={kind:'query',query:{kind:'testId',value:{kind:'string',value:'row-quoted',exact:true}}} as const;
+  const union={kind:'union',left:quote,right:last} as const;
+  expect((await engine.locate!(union,op)).map(n=>n.testId)).toEqual(['row-last-name','row-quoted']);
+  expect(await engine.locate!({kind:'union',left:last,right:last},op)).toHaveLength(1);
+  expect((await engine.locate!({kind:'index',source:union,index:'first'},op)).map(n=>n.testId)).toEqual(['row-last-name']);
+ } finally {
+  await engine.endAttempt!(cleanup()); await engine.dispose!(cleanup()); await app.close(); rmSync(artifacts,{recursive:true,force:true});
+ }
+});

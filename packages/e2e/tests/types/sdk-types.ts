@@ -621,3 +621,8 @@ void list({ grep: ['plain'] });
 // @ts-expect-error disposition is run, skip, or filtered
 const disposition: ListedPair['disposition'] = 'pending';
 void disposition;
+
+declare const alternativeLocator: import("../../src/types.ts").Locator;
+void (alternativeLocator.or(alternativeLocator) satisfies import("../../src/types.ts").Locator);
+// @ts-expect-error an alternative must be a Locator
+void alternativeLocator.or("tab");

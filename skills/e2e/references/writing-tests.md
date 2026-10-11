@@ -430,3 +430,5 @@ A `route`, `unroute`, or `waitForResponse` pattern is a glob string or
 - No sleeps or polling loops; a matcher with a longer `timeout` instead.
 - `await` every step call and `expect.poll`, else `STEP_NOT_AWAITED` at the line of the call.
 - Assert the fact a model produced with `toContain`, not its exact sentence.
+
+Combine alternative locators with `first.or(second)`. Matches keep traversal order and overlapping nodes count once. Both locators must belong to the same target and attempt. Multiple distinct matches remain ambiguous for an action. Web branches must share a document; display-value compositions retain the documented engine limitation.

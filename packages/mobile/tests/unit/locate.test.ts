@@ -109,3 +109,11 @@ describe('locator expressions over a device snapshot', () => {
     );
   });
 });
+
+
+it('unions snapshot matches in traversal order, removing overlapping entries', () => {
+ const back=query('role','button'); const search=query('label','Search');
+ expect(names({kind:'union',left:search,right:back})).toEqual(['Back','Search']);
+ expect(names({kind:'union',left:back,right:back})).toEqual(['Back']);
+ expect(names({kind:'index',source:{kind:'union',left:search,right:back},index:'first'})).toEqual(['Back']);
+});

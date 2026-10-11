@@ -12,6 +12,10 @@ import { compileSelector } from './selector.ts';
 /** Resolves one expression to the nodes it currently matches. */
 export function resolveExpression(expression: LocatorExpression, index: readonly ProjectedNode[]): ProjectedNode[] {
   switch (expression.kind) {
+    case 'union': {
+      const matches = new Set([...resolveExpression(expression.left, index), ...resolveExpression(expression.right, index)]);
+      return index.filter(entry => matches.has(entry));
+    }
     case 'query': {
       const candidates =
         expression.scope === undefined ? index : descendantsOf(resolveExpression(expression.scope, index), index);
