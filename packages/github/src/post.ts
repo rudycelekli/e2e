@@ -52,6 +52,9 @@ async function request(params: PostParams, method: Method, route: string, body?:
   if (response.ok) return response.json().catch(() => undefined);
   const detail = (await response.text().catch(() => '')).slice(0, 200);
   if (response.status === 401) throw new Error('GitHub rejected the token (GITHUB_TOKEN or GH_TOKEN)');
+  if ((response.status === 403 || response.status === 429) && (response.status === 429 || response.headers.get('x-ratelimit-remaining') === '0' || response.headers.has('retry-after') || /secondary rate limit/i.test(detail))) {
+    throw new Error(`GitHub rate limited ${method} ${route}; wait for the rate-limit reset or Retry-After before rerunning the job`);
+  }
   if (response.status === 403 || response.status === 404) {
     throw new Error(
       `the token cannot comment on ${params.repository}#${params.pullRequest}: a pull request from a fork runs with a read-only token, and the job needs \`permissions: pull-requests: write\``,

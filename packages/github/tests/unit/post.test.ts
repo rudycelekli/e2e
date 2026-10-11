@@ -99,3 +99,34 @@ describe('upsertComment', () => {
     expect(calls).toHaveLength(1);
   });
 });
+
+import { createServer } from 'node:http';
+import { once } from 'node:events';
+describe('GitHub REST rate-limit diagnostics', () => {
+  it.each([
+    { status: 403, headers: { 'x-ratelimit-remaining': '0' }, message: 'API rate limit exceeded' },
+    { status: 403, headers: { 'retry-after': '60' }, message: 'slow down' },
+    { status: 403, headers: {}, message: 'You have exceeded a secondary rate limit' },
+    { status: 429, headers: {}, message: 'too many requests' },
+  ])('identifies throttling for HTTP $status without recommending more permissions', async ({ status, headers, message }) => {
+    let requests = 0;
+    const server = createServer((_request, response) => {
+      requests += 1;
+      response.writeHead(status, { 'content-type': 'application/json', ...headers });
+      response.end(JSON.stringify({ message }));
+    });
+    server.listen(0, '127.0.0.1');
+    await once(server, 'listening');
+    const address = server.address();
+    if (address === null || typeof address === 'string') throw new Error('test server did not bind');
+    try {
+      const call = upsertComment({ ...params(fetch), apiUrl: `http://127.0.0.1:${address.port}` });
+      await expect(call).rejects.toThrow('GitHub rate limited GET');
+      await expect(call).rejects.toThrow('before rerunning the job');
+      await expect(call).rejects.not.toThrow('permissions');
+      expect(requests).toBe(1);
+    } finally {
+      await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    }
+  });
+});
