@@ -627,6 +627,11 @@ export class PlaywrightSurface {
     return this.requireSession().ensurePage();
   }
 
+  /** Applies network emulation through the sole attempt binding owner. */
+  setOffline(offline: boolean): Promise<void> {
+    return this.requireSession().setOffline(offline);
+  }
+
   /** Sizes the open page, or the one the next navigation opens, for the rest of the attempt. */
   setViewport(size: { readonly width: number; readonly height: number }): Promise<void> {
     return this.requireSession().setViewport(size);

@@ -52,6 +52,7 @@ export class AttemptSession {
   private observed = true;
   /** Until the attempt's first page opens: a persistent browser's own first tab can serve as that page. */
   private firstPage = true;
+  private requestedOffline: boolean | undefined;
   private requestedViewport: { readonly width: number; readonly height: number } | undefined;
 
   constructor(private readonly options: SessionOptions) {
@@ -170,6 +171,7 @@ export class AttemptSession {
       try {
         if (budget.signal.aborted) throw connectionAbort(budget.signal, 'connection');
         await this.options.configure(candidate.context);
+        if (this.requestedOffline !== undefined) await candidate.context.setOffline(this.requestedOffline);
         if (recover && candidate.page !== null) {
           const size = previous?.page?.viewportSize() ?? this.requestedViewport ?? this.options.viewport;
           if (size !== null) await candidate.page.setViewportSize(size);
@@ -237,6 +239,14 @@ export class AttemptSession {
       }
     }
     return context.newPage();
+  }
+
+  /** Remembers only successfully applied network state for this attempt's future bindings. */
+  async setOffline(offline: boolean): Promise<void> {
+    const token = this.token();
+    await this.current().context.setOffline(offline);
+    this.check(token);
+    this.requestedOffline = offline;
   }
 
   /** Sizes the open page, if any, and every page this attempt opens after it. */

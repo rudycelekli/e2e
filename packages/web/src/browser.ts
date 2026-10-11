@@ -243,6 +243,8 @@ export interface Browser extends Expectable<BrowserExpectation> {
   cookies(): Promise<Cookie[]>;
   /** Sets cookies after URL validation. */
   setCookies(cookies: readonly Cookie[]): Promise<void>;
+  /** Emulates offline or online network state for this attempt, including replacement contexts and recovery. */
+  setOffline(offline: boolean): Promise<void>;
   /** Sets the viewport size. */
   setViewport(size: { width: number; height: number }): Promise<void>;
   /** Registers an attempt-scoped dialog handler and returns an unsubscribe function. */
@@ -557,6 +559,12 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
         );
       });
     },
+    setOffline(offline) {
+      if (typeof offline !== 'boolean') {
+        throw new TestError('INVALID_ARGUMENT', 'browser.setOffline needs a boolean');
+      }
+      return surface.guard(context.operation(), 'setOffline', () => surface.setOffline(offline));
+    },
     setViewport: (size) =>
       surface.guard(context.operation(), 'setViewport', async () => {
         await surface.setViewport(size);
@@ -649,6 +657,7 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
     cookies: action,
     setCookies: action,
     setViewport: action,
+    setOffline: action,
     onDialog: action,
     waitForDownload: { ...action, timeout: (_trigger, options) => options?.timeout },
     keyboard: { press: { ...action, label: (key) => key }, type: { ...action, label: (text) => `${text.length} chars` } },

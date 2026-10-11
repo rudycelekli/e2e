@@ -319,6 +319,8 @@ export interface Browser extends Expectable<BrowserExpectation> {
   cookies(): Promise<Cookie[]>;
   /** Sets cookies after URL validation. */
   setCookies(cookies: readonly Cookie[]): Promise<void>;
+  /** Emulates offline or online network state for this attempt, including replacement contexts and recovery. */
+  setOffline(offline: boolean): Promise<void>;
   /** Sets the viewport size. */
   setViewport(size: { width: number; height: number }): Promise<void>;
   /** Registers an attempt-scoped dialog handler and returns an unsubscribe function. */
@@ -380,6 +382,27 @@ takes `timeout` only: another key, such as Playwright's `waitUntil`, is
 await browser.goto('/dashboard', { waitUntil: 'networkidle' });
 await browser.waitForURL(/\/orders\/\d+$/, { timeout: 15_000 });
 ```
+
+### Offline app flows
+
+`browser.setOffline(true)` emulates loss of network access in this attempt's
+browser context. `navigator.onLine` changes and uncached network requests fail;
+requests satisfied by a cache or a service worker can still succeed. Restore
+network access with `browser.setOffline(false)`.
+
+```ts
+await app.open('/');
+await browser.setOffline(true);
+// Exercise the app's offline UI against its existing document.
+await browser.setOffline(false);
+```
+
+The requested setting follows replacement pages, context resets and CDP recovery
+within this attempt. Restarting or clearing state also navigates the app, so that
+navigation can fail while offline; restore network access before reopening an
+app that needs the network. A new ordinary attempt starts with its own online
+context. When attaching to a dedicated persistent browser, its original network
+state is left alone until this attempt explicitly calls `setOffline`.
 
 ### Locators and frames
 
