@@ -83,7 +83,7 @@ export function code(text: string, max = MAX_CELL_CHARS): string {
  * to the rendered page, so those are percent-encoded.
  */
 function href(url: string): string {
-  return collapseText(url).replace(/[\s()<>]/g, (char) => `%${char.charCodeAt(0).toString(16).toUpperCase().padStart(2, '0')}`);
+  return url.replace(/[\s()<>]/gu, (char) => encodeURIComponent(char).replace(/[()]/g, (delimiter) => `%${delimiter.charCodeAt(0).toString(16).toUpperCase()}`));
 }
 
 export function link(text: string, url: string): string {
