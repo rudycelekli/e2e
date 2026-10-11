@@ -392,6 +392,8 @@ the app opens itself (`target="_blank"`, `window.open`) is not followed:
   `route.fetch()` reads upstream without deciding the route; its response has
   `url`, `status`, `headers`, `text()`, and `json()`. It takes no overrides,
   uses the action budget, and returns redirects without following them.
+  Unreadable bodies keep the metadata but make `text()` and `json()` reject
+  with `ACTION_FAILED`.
   The handler calls exactly one of
   `fulfill({ status?, headers?, contentType?, json | body | path })`,
   `continue({ url?, method?, headers?, postData? })` (straight to the

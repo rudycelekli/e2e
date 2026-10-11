@@ -13,11 +13,13 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Page } from 'playwright-core';
 import { TestError, type EngineFixtureContext } from 'e2e/engine';
 import { PlaywrightSurface } from '../../src/surface.ts';
-import { createBrowserFixture, type Browser, type WebRoute } from '../../src/browser.ts';
+import type { Browser, WebRoute } from '../../src/browser.ts';
+const browserModule = '../../dist/browser.js';
+const { createBrowserFixture } = await import(browserModule) as typeof import('../../src/browser.ts');
 import { ignoreTrace, noSecrets } from '../helpers/secrets.ts';
 
 interface Echo {
@@ -153,6 +155,34 @@ describe('browser.route decisions', () => {
     });
     expect(await page.evaluate(async url => (await fetch(url)).json(), `${origin}/echo`)).toMatchObject({ amended: true });
     expect(hits.get('/echo')).toBe(1);
+  });
+
+  it('keeps upstream metadata when the native API response body is unavailable', async () => {
+    const register = page.route.bind(page);
+    const spy = vi.spyOn(page, 'route').mockImplementation((url, handler, options) => register(url, async (route, request) => {
+      const fetch = route.fetch.bind(route);
+      route.fetch = async (...args) => {
+        const response = await fetch(...args);
+        await response.dispose();
+        return response;
+      };
+      await handler(route, request);
+    }, options));
+    try {
+      await browser.route('**/echo', async route => {
+        const upstream = await route.fetch();
+        expect(upstream.status).toBe(200);
+        expect(upstream.url).toBe(`${origin}/echo`);
+        expect(upstream.headers['content-type']).toContain('application/json');
+        await expect(upstream.text()).rejects.toMatchObject({code:'ACTION_FAILED', message:expect.stringContaining('route.fetch')});
+        await expect(upstream.json()).rejects.toMatchObject({code:'ACTION_FAILED'});
+        await route.fulfill({body:'safe fallback'});
+      });
+      expect(await fetchText(`${origin}/echo`)).toBe('safe fallback');
+      expect(hits.get('/echo')).toBe(1);
+    } finally {
+      spy.mockRestore();
+    }
   });
 
   it('returns an upstream redirect without following it', async () => {

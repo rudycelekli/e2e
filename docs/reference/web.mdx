@@ -472,7 +472,8 @@ URL; a predicate function is `INVALID_ARGUMENT`. A route survives
 `route.fetch()` reads the upstream response for inspection or amendment,
 returning `{ url, status, headers, text(), json() }`. It preserves configured
 site headers, uses the action budget, and returns redirects without following
-them. It takes no overrides and does not decide the intercepted request.
+them. If the upstream body cannot be read, metadata remains available and
+`text()` and `json()` reject with `ACTION_FAILED`. It takes no overrides and does not decide the intercepted request.
 The handler must still decide exactly once with `fulfill`, `continue`, `fallback`,
 or `abort`; deciding twice or not at all is `ACTION_FAILED`. Routes run newest
 first. `continue` sends the request to the network and no other route sees

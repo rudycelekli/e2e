@@ -418,11 +418,18 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
                 maxRedirects: 0,
               });
               try {
-                const body = await response.text();
+                let text: () => Promise<string>;
+                try {
+                  const body = await response.text();
+                  text = () => Promise.resolve(body);
+                } catch (cause) {
+                  const error = new TestError('ACTION_FAILED', `route.fetch: response body could not be read: ${causeMessage(cause)}`);
+                  text = () => Promise.reject(error);
+                }
                 return {
                   url: response.url(), status: response.status(), headers: response.headers(),
-                  text: async () => body,
-                  json: async <T = unknown>() => JSON.parse(body) as T,
+                  text,
+                  json: async <T = unknown>() => JSON.parse(await text()) as T,
                 };
               } finally {
                 await response.dispose();
