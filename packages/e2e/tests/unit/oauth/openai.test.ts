@@ -334,3 +334,35 @@ describe('Codex requests', () => {
     await expect(listModels('openai', new MemoryCredentialStore())).rejects.toMatchObject({ code: 'NOT_LOGGED_IN' });
   });
 });
+
+import { execFileSync } from 'node:child_process';
+it('releases the real browser callback port when the UI callback throws', () => {
+  const source = new URL('../../../src/oauth/providers/openai.ts', import.meta.url).href;
+  const loader = new URL('../../../src/config/register.ts', import.meta.url).href;
+  const script = `
+    import { createServer } from 'node:net';
+    import { createCodexProvider } from ${JSON.stringify(source)};
+    let callbackPort;
+    let originalError;
+    try {
+      await createCodexProvider({ issuer: 'http://127.0.0.1:1', callbackPort: 0 }).login({
+        onAuth(info) {
+          const redirect = new URL(new URL(info.url).searchParams.get('redirect_uri'));
+          callbackPort = Number(redirect.port);
+          throw new Error('local UI failure');
+        },
+        onPrompt: async () => { throw new Error('must not prompt'); },
+      });
+    } catch (error) { originalError = error.message; }
+    const probe = createServer();
+    const reusable = await new Promise(resolve => {
+      probe.once('error', () => resolve(false));
+      probe.listen(callbackPort, '127.0.0.1', () => resolve(true));
+    });
+    if (reusable) await new Promise(resolve => probe.close(resolve));
+    console.log(JSON.stringify({ reusable, originalError }));
+    process.exit(0);
+  `;
+  const output = execFileSync(process.execPath, ['--import', loader, '--input-type=module', '-e', script], { encoding: 'utf8' });
+  expect(JSON.parse(output)).toEqual({ reusable: true, originalError: 'local UI failure' });
+});

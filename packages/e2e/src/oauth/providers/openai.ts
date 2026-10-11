@@ -176,28 +176,28 @@ async function browserLogin(callbacks: OAuthLoginCallbacks, flow: BrowserLogin):
   const { verifier, challenge } = await generatePkce();
   const state = randomState();
   const server = await startCallbackServer({ port: flow.callbackPort, path: CALLBACK_PATH, state, productName: 'ChatGPT login' });
-  const redirectUri = server?.redirectUri ?? `http://localhost:${flow.callbackPort}${CALLBACK_PATH}`;
-  const url = new URL(`${flow.issuer}/oauth/authorize`);
-  url.search = new URLSearchParams({
-    response_type: 'code',
-    client_id: CLIENT_ID,
-    redirect_uri: redirectUri,
-    scope: SCOPE,
-    code_challenge: challenge,
-    code_challenge_method: 'S256',
-    id_token_add_organizations: 'true',
-    codex_cli_simplified_flow: 'true',
-    state,
-    originator: flow.originator,
-  }).toString();
-  callbacks.onAuth({
-    url: url.toString(),
-    instructions:
-      server === undefined
-        ? `Port ${flow.callbackPort} is in use, so the browser cannot return here: sign in, then paste the URL the browser lands on.`
-        : 'Sign in in the browser; this terminal continues when the browser returns, or asks for the URL it landed on.',
-  });
   try {
+    const redirectUri = server?.redirectUri ?? `http://localhost:${flow.callbackPort}${CALLBACK_PATH}`;
+    const url = new URL(`${flow.issuer}/oauth/authorize`);
+    url.search = new URLSearchParams({
+      response_type: 'code',
+      client_id: CLIENT_ID,
+      redirect_uri: redirectUri,
+      scope: SCOPE,
+      code_challenge: challenge,
+      code_challenge_method: 'S256',
+      id_token_add_organizations: 'true',
+      codex_cli_simplified_flow: 'true',
+      state,
+      originator: flow.originator,
+    }).toString();
+    callbacks.onAuth({
+      url: url.toString(),
+      instructions:
+        server === undefined
+          ? `Port ${flow.callbackPort} is in use, so the browser cannot return here: sign in, then paste the URL the browser lands on.`
+          : 'Sign in in the browser; this terminal continues when the browser returns, or asks for the URL it landed on.',
+    });
     const code = server === undefined ? await pasteCode(callbacks, state) : await answerOrPaste(server, callbacks, state, flow.timeoutMs);
     if (code === undefined) throw new OAuthError('FLOW_FAILED', 'no authorization code was received');
     callbacks.onProgress?.('Exchanging the code for tokens');
