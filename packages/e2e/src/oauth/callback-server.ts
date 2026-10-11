@@ -74,7 +74,10 @@ export async function startCallbackServer(options: CallbackServerOptions): Promi
       new Promise<CallbackAnswer>((resolve, reject) => {
         const cancelled = () => new OAuthError('CANCELLED', 'the login was cancelled');
         if (signal?.aborted) return reject(cancelled());
-        const timer = setTimeout(() => reject(new OAuthError('TIMEOUT', 'the browser did not return in time')), timeoutMs);
+        const timer = setTimeout(() => {
+          signal?.removeEventListener('abort', onAbort);
+          reject(new OAuthError('TIMEOUT', 'the browser did not return in time'));
+        }, timeoutMs);
         const onAbort = () => {
           clearTimeout(timer);
           reject(cancelled());
