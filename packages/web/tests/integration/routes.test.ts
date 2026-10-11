@@ -158,8 +158,9 @@ describe('browser.route decisions', () => {
   });
 
   it('keeps upstream metadata when the native API response body is unavailable', async () => {
-    const register = page.route.bind(page);
-    const spy = vi.spyOn(page, 'route').mockImplementation((url, handler, options) => register(url, async (route, request) => {
+    const context = page.context();
+    const register = context.route.bind(context);
+    const spy = vi.spyOn(context, 'route').mockImplementation((url, handler, options) => register(url, async (route, request) => {
       const fetch = route.fetch.bind(route);
       route.fetch = async (...args) => {
         const response = await fetch(...args);
