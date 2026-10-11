@@ -440,3 +440,40 @@ test.describe('retained flow', { serial: true, retries: 1 }, () => {
     expect(markdown).toContain(firstDuration < 1000 ? `${Math.round(firstDuration)}ms` : `${(firstDuration / 1000).toFixed(1)}s`);
   });
 }, 60_000);
+
+
+it('the built CLI retains a completed member time when its first serial attempt is interrupted', () => {
+  const suite = `import { appendFileSync } from 'node:fs';
+import { test, expect } from 'e2e';
+${LOG_HELPER}
+test.describe('first flow', { serial: true }, () => {
+  test('completed member', async () => {
+    await new Promise(resolve => setTimeout(resolve, 200));
+  });
+  test('waiting member', async () => {
+    log('member.waiting');
+    await expect.poll(() => false, { timeout: 600_000 }).toBe(true);
+  });
+});
+`;
+  return withRunningCli({
+    files: {
+      'e2e.config.ts': config().replace('workers: 1,', "workers: 1, reporters: ['markdown', 'junit'],"),
+      'tests/serial.e2e.ts': suite,
+    }, until: 'member.waiting',
+  }, async run => {
+    run.signalGroup('SIGINT');
+    expect(await run.exit).toBe(130);
+    const report = JSON.parse(readFileSync(path.join(run.projectDir, '.e2e', 'report.json'), 'utf8')) as import('../../src/report/build.ts').Report1Document;
+    const group = report.run.serialGroups[0]!;
+    expect(group.attempts).toHaveLength(1);
+    expect(group.attempts[0]!.status).toBe('interrupted');
+    const duration = group.attempts[0]!.members[0]!.durationMs;
+    expect(duration).toBeGreaterThanOrEqual(190);
+    expect(report.run.results[0]!.status).toBe('passed');
+    const markdown = readFileSync(path.join(run.projectDir, '.e2e', 'summary.md'), 'utf8');
+    const junit = readFileSync(path.join(run.projectDir, '.e2e', 'junit.xml'), 'utf8');
+    expect(junit).toContain(`time="${(duration / 1000).toFixed(3)}"`);
+    expect(markdown).toContain(duration < 1000 ? `${Math.round(duration)}ms` : `${(duration / 1000).toFixed(1)}s`);
+  });
+}, 60_000);

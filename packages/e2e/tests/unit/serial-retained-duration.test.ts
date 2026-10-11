@@ -6,13 +6,18 @@ import { REPORT_AT, reportAttempt, reportDocument, reportResult } from '../helpe
 function fixture(status: 'failed' | 'passed', lastStatus: 'interrupted' | 'failed') {
  const result = reportResult({status, serialGroupId: 'g', attempts: []});
  const member = (state: 'failed' | 'passed' | 'skipped', ms: number) => ({id: 'm', index: 0, testId: result.testId, status: state, startedAt: REPORT_AT, durationMs: ms, steps: [], secondaryErrors: []});
- const group: ReportSerialGroup = {id:'g', serialId:'g', declarationIndex:0, file:result.file, source:result.source, titlePath:['flow'], targetId:result.targetId, platform:result.platform, agent:result.agent, repeat:0, memberTestIds:[result.testId], status, attempts:[{...reportAttempt({status}), members:[member(status, 1250)]},{...reportAttempt({status:lastStatus}), members:[member('skipped',0)]}]};
+ const group: ReportSerialGroup = {id:'g', serialId:'g', declarationIndex:0, file:result.file, source:result.source, titlePath:['flow'], targetId:result.targetId, platform:result.platform, agent:result.agent, repeat:0, memberTestIds:[result.testId], status, attempts:[{...reportAttempt({status}), members:[member(status, 1250)]},{...reportAttempt({status:lastStatus,index:1}), members:[member('skipped',0)]}]};
  return {result,group};
 }
 describe('retained serial verdict timing', () => {
  it.each(['failed','passed'] as const)('keeps the %s verdict duration after an interrupted retry', status => {
   const {result,group}=fixture(status,'interrupted');
   expect(outcome(result,new Map([['g',group]])).durationMs).toBe(1250);
+ });
+ it.each(['failed','passed'] as const)('keeps a completed %s member duration in an interrupted first attempt', status => {
+  const {result,group}=fixture(status,'interrupted');
+  const interrupted: ReportSerialGroup = {...group, attempts:[{...group.attempts[0]!, index:0, status:'interrupted'}]};
+  expect(outcome(result,new Map([['g',interrupted]])).durationMs).toBe(1250);
  });
  it('keeps duration when a retry never reached a member', () => {
   const {result,group}=fixture('failed','failed');

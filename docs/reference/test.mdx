@@ -323,7 +323,8 @@ fails the first member with that error and skips the rest with cause
 every member skips instead. On a retry, the members keep the verdicts of
 the attempt before it. A retained verdict keeps its measured duration in
 the report, Markdown summary, and JUnit output; a retry that skipped the
-member or was interrupted does not replace that duration with zero.
+member or was interrupted does not replace that duration with zero. A member
+that completed in an interrupted first attempt keeps its measured duration too.
 The exit code follows the error's category, as for any
 other test.
 
