@@ -397,3 +397,46 @@ describe('interrupt signals against the CLI', () => {
     60_000,
   );
 });
+
+
+it('the built CLI retains serial verdict time in Markdown and JUnit after retry interruption', () => {
+  const suite = `import { appendFileSync, readFileSync } from 'node:fs';
+import { test, expect } from 'e2e';
+${LOG_HELPER}
+test.describe('retained flow', { serial: true, retries: 1 }, () => {
+  test.beforeEach(async () => {
+    if (readFileSync(process.env.SIGNAL_LOG!, 'utf8').includes(' verdict.done')) {
+      log('retry.start');
+      await expect.poll(() => false, { timeout: 600_000 }).toBe(true);
+    }
+  });
+  test('visible failure', async () => {
+    log('test.start');
+    await new Promise(resolve => setTimeout(resolve, 200));
+    log('verdict.done');
+    expect(true).toBe(false);
+  });
+});
+`;
+  return withRunningCli({
+    files: {
+      'e2e.config.ts': config().replace('workers: 1,', "workers: 1, reporters: ['markdown', 'junit'],"),
+      'tests/serial.e2e.ts': suite,
+    }, until: 'retry.start',
+  }, async run => {
+    run.signalGroup('SIGINT');
+    expect(await run.exit).toBe(130);
+    const report = JSON.parse(readFileSync(path.join(run.projectDir, '.e2e', 'report.json'), 'utf8')) as import('../../src/report/build.ts').Report1Document;
+    const group = report.run.serialGroups[0]!;
+    expect(group.attempts).toHaveLength(2);
+    const firstDuration = group.attempts[0]!.members[0]!.durationMs;
+    expect(firstDuration).toBeGreaterThanOrEqual(190);
+    expect(group.attempts[1]!.status).toBe('interrupted');
+    expect(report.run.results[0]!.status).toBe('failed');
+    expect(report.run.usage.maxModelCallsInStep).toBe(0);
+    const markdown = readFileSync(path.join(run.projectDir, '.e2e', 'summary.md'), 'utf8');
+    const junit = readFileSync(path.join(run.projectDir, '.e2e', 'junit.xml'), 'utf8');
+    expect(junit).toContain(`time="${(firstDuration / 1000).toFixed(3)}"`);
+    expect(markdown).toContain(firstDuration < 1000 ? `${Math.round(firstDuration)}ms` : `${(firstDuration / 1000).toFixed(1)}s`);
+  });
+}, 60_000);

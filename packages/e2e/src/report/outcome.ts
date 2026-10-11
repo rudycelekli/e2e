@@ -95,6 +95,11 @@ function attemptViews(result: ReportResult, groups: ReadonlyMap<string, ReportSe
 
 function durationOf(result: ReportResult, groups: ReadonlyMap<string, ReportSerialGroup>): number {
   if (result.serialGroupId === undefined) return result.attempts.at(-1)?.durationMs ?? 0;
-  const last = groups.get(result.serialGroupId)?.attempts.at(-1);
-  return last?.members.find((candidate) => candidate.testId === result.testId)?.durationMs ?? 0;
+  for (const attempt of (groups.get(result.serialGroupId)?.attempts ?? []).toReversed()) {
+    if (attempt.status === 'interrupted' && result.status !== 'interrupted') continue;
+    const member = attempt.members.find((candidate) => candidate.testId === result.testId);
+    if (member === undefined || (member.status === 'skipped' && result.status !== 'skipped')) continue;
+    return member.durationMs;
+  }
+  return 0;
 }
