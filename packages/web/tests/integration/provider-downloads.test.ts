@@ -140,12 +140,12 @@ describe.each<BrowserProviderScope>(['worker', 'attempt'])('downloads through a 
       release: async () => undefined,
       downloads: {
         dir: path.join(remoteDisk, 'downloads'),
-        async read(_lease, file, { signal }) {
+        async read(_lease, file, { signal: readCancellation }) {
           expect((await readFile(file)).toString()).toBe('stalled provider body');
-          readSignal = signal;
+          readSignal = readCancellation;
           return new Promise<Uint8Array>((_resolve, reject) => {
-            if (signal.aborted) reject(new Error('provider read canceled'));
-            else signal.addEventListener('abort', () => reject(new Error('provider read canceled')), { once: true });
+            if (readCancellation.aborted) reject(new Error('provider read canceled'));
+            else readCancellation.addEventListener('abort', () => reject(new Error('provider read canceled')), { once: true });
           });
         },
       },
@@ -159,7 +159,7 @@ describe.each<BrowserProviderScope>(['worker', 'attempt'])('downloads through a 
     await page.evaluate(() => {
       const link = document.createElement('a');
       link.href = URL.createObjectURL(new Blob(['stalled provider body']));
-      link.download = 'report.txt';link.id = 'download';document.body.append(link);
+      link.download = 'report.txt';link.id = 'download';link.textContent = 'Download';document.body.append(link);
     });
     const attached: string[] = [];
     const browser = engine.fixtures!['browser']!({
@@ -175,6 +175,7 @@ describe.each<BrowserProviderScope>(['worker', 'attempt'])('downloads through a 
         work.then(() => ({ code: 'completed', message: '' }), (error: { code: string; message: string }) => error),
         new Promise<{ code: string; message: string }>((resolve) => { watchdog = setTimeout(() => resolve({ code: 'still pending', message: '' }), 1500); }),
       ]);
+      expect(readSignal).toBeDefined();
       expect(result).toMatchObject({ code: 'ACTION_FAILED', message: expect.stringContaining('did not finish') });
       expect(readSignal?.aborted).toBe(true);
       expect(attached).toEqual([]);

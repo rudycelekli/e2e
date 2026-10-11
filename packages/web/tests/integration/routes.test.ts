@@ -42,9 +42,9 @@ function startCountingServer(hits: Map<string, number>): Promise<{ server: Serve
       response.writeHead(200, {
         'content-type': 'application/octet-stream',
         'content-disposition': 'attachment; filename="stream.bin"',
-        'content-length': '1024',
+        'content-length': '4096',
       });
-      response.write('partial');
+      response.write(Buffer.alloc(1024, 'x'));
       return;
     }
     if (pathname === '/echo') {
@@ -166,14 +166,16 @@ describe('browser.route decisions', () => {
     const baseline = (page as unknown as EventEmitter).listenerCount('download');
     let download: Download | undefined;
     page.once('download', value => { download=value; });
-    const work = browser.waitForDownloads(() => page.getByRole('link', {name:'Stream'}).click(), {count:1, timeout:500});
+    const work = browser.waitForDownloads(() => page.evaluate(() => document.querySelector<HTMLAnchorElement>('a')!.click()), {count:1, timeout:500});
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
       const result = await Promise.race([work.then(() => 'completed', cause => cause), new Promise(resolve => { timer=setTimeout(() => resolve('still pending'), 1500); })]);
+      expect(download).toBeDefined();
       expect(result).toMatchObject({code:'ACTION_FAILED',message:expect.stringContaining('did not finish')});
       expect((page as unknown as EventEmitter).listenerCount('download')).toBe(baseline);
     } finally {
       if(timer!==undefined) clearTimeout(timer);
+      server.closeAllConnections();
       await download?.cancel();
       await work.catch(() => undefined);
     }
