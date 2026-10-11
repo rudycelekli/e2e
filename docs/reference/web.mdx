@@ -469,7 +469,11 @@ A script added after the page opened runs from the next navigation or reload.
 path segment, `**` across `/`) or a `RegExp`, both tested against the full
 URL; a predicate function is `INVALID_ARGUMENT`. A route survives
 `app.restart()`, `app.clearState()`, and session restore.
-The handler must decide exactly once with `fulfill`, `continue`, `fallback`,
+`route.fetch()` reads the upstream response for inspection or amendment,
+returning `{ url, status, headers, text(), json() }`. It preserves configured
+site headers, uses the action budget, and returns redirects without following
+them. It takes no overrides and does not decide the intercepted request.
+The handler must still decide exactly once with `fulfill`, `continue`, `fallback`,
 or `abort`; deciding twice or not at all is `ACTION_FAILED`. Routes run newest
 first. `continue` sends the request to the network and no other route sees
 it; its `url` resolves against the base URL and goes through the same rule as
@@ -546,6 +550,8 @@ export interface WebRoute {
     readonly headers: Readonly<Record<string, string>>;
     readonly postData?: string;
   };
+  /** Reads upstream without deciding the route or following redirects. */
+  fetch(): Promise<WebResponse>;
   /** Fulfills the intercepted request once. */
   fulfill(response: RouteFulfillResponse): Promise<void>;
   /** Sends the intercepted request to the network once, skipping every other route. */

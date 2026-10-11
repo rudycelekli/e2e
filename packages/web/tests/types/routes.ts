@@ -16,6 +16,9 @@ import type { RouteContinueOverrides, RouteFulfillResponse, WebRoute } from '../
 ({ headers: { 'x-n': 1 } }) satisfies RouteContinueOverrides;
 
 declare const route: WebRoute;
+void (route.fetch().then(response => response.text()) satisfies Promise<string>);
+// @ts-expect-error upstream fetch currently takes no overrides
+void route.fetch({ timeout: 100 });
 void route.continue();
 void route.fallback();
 // @ts-expect-error `abort` takes no Playwright error code.

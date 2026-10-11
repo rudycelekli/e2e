@@ -35,6 +35,11 @@ function startCountingServer(hits: Map<string, number>): Promise<{ server: Serve
   const server = createServer((request, response) => {
     const pathname = new URL(request.url ?? '/', 'http://host').pathname;
     hits.set(pathname, (hits.get(pathname) ?? 0) + 1);
+    if (pathname === '/redirect') {
+      response.writeHead(302, { location: '/echo' });
+      response.end();
+      return;
+    }
     if (pathname === '/echo') {
       let body = '';
       request.on('data', (chunk: Buffer) => { body += chunk.toString(); });
@@ -134,6 +139,33 @@ describe('browser.route decisions', () => {
 
   /** Waits for the latched route failure the next step reports. */
   const nextStepFailure = (): Promise<unknown> => browser.url().then(() => undefined, (error: unknown) => error);
+
+  it('fetches upstream once, keeps site headers, then fulfills an amended response', async () => {
+    await browser.route('**/echo', async route => {
+      const upstream = await route.fetch();
+      expect(upstream.status).toBe(200);
+      expect(upstream.url).toBe(`${origin}/echo`);
+      expect(upstream.headers['content-type']).toContain('application/json');
+      const echo = await upstream.json<Echo>();
+      expect(echo.headers['x-gate']).toBe('open-sesame');
+      expect(JSON.parse(await upstream.text())).toEqual(echo);
+      await route.fulfill({ json: { ...echo, amended: true } });
+    });
+    expect(await page.evaluate(async url => (await fetch(url)).json(), `${origin}/echo`)).toMatchObject({ amended: true });
+    expect(hits.get('/echo')).toBe(1);
+  });
+
+  it('returns an upstream redirect without following it', async () => {
+    await browser.route('**/redirect', async route => {
+      const upstream = await route.fetch();
+      expect(upstream.status).toBe(302);
+      expect(upstream.headers['location']).toBe('/echo');
+      await route.fulfill({ body: 'inspected redirect' });
+    });
+    expect(await fetchText(`${origin}/redirect`)).toBe('inspected redirect');
+    expect(hits.get('/redirect')).toBe(1);
+    expect(hits.get('/echo')).toBeUndefined();
+  });
 
   it('answers with the route registered last when two fulfill', async () => {
     await browser.route('**/api/**', (route) => route.fulfill({ body: 'earlier' }));
