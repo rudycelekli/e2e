@@ -14,6 +14,7 @@ import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import type { EventEmitter } from 'node:events';
 import type { Page } from 'playwright-core';
 import { TestError, type EngineFixtureContext } from 'e2e/engine';
 import { PlaywrightSurface } from '../../src/surface.ts';
@@ -134,6 +135,28 @@ describe('browser.route decisions', () => {
 
   /** Waits for the latched route failure the next step reports. */
   const nextStepFailure = (): Promise<unknown> => browser.url().then(() => undefined, (error: unknown) => error);
+
+  it('rejects an invalid download count before running the trigger', async () => {
+    let calls = 0;
+    await expect(browser.waitForDownloads(async () => { calls += 1; }, { count: 0 })).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+    expect(calls).toBe(0);
+  });
+
+  it('removes a multi-download listener after an incomplete trigger times out', async () => {
+    const listeners = (page as unknown as EventEmitter).listenerCount('download');
+    await expect(browser.waitForDownloads(async () => undefined, { count: 2, timeout: 30 })).rejects.toMatchObject({
+      code: 'ACTION_FAILED', message: expect.stringContaining('0 of 2 downloads'),
+    });
+    expect((page as unknown as EventEmitter).listenerCount('download')).toBe(listeners);
+  });
+
+  it('keeps a trigger error and removes the multi-download listener immediately', async () => {
+    const listeners = (page as unknown as EventEmitter).listenerCount('download');
+    const failure = new TestError('ASSERTION_FAILED', 'trigger assertion');
+    await expect(browser.waitForDownloads(async () => { throw failure; }, { count: 2, timeout: 30 })).rejects.toBe(failure);
+    expect((page as unknown as EventEmitter).listenerCount('download')).toBe(listeners);
+    await new Promise(resolve => setTimeout(resolve, 50));
+  });
 
   it('answers with the route registered last when two fulfill', async () => {
     await browser.route('**/api/**', (route) => route.fulfill({ body: 'earlier' }));

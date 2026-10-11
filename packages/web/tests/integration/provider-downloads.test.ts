@@ -52,7 +52,7 @@ describe.each<BrowserProviderScope>(['worker', 'attempt'])('downloads through a 
     if (remoteDisk !== undefined) rmSync(remoteDisk, { recursive: true, force: true });
   });
 
-  it('saves the file on the browser\'s disk and reads it back through the provider', async () => {
+  it.each([1, 2])('saves %i files on the browser disk through one trigger', async (count) => {
     artifactsDir = mkdtempSync(path.join(tmpdir(), 'e2e-provider-downloads-'));
     remoteDisk = mkdtempSync(path.join(tmpdir(), 'e2e-browser-disk-'));
     chrome = await launchRemoteChrome();
@@ -80,14 +80,16 @@ describe.each<BrowserProviderScope>(['worker', 'attempt'])('downloads through a 
     await engine.startAttempt!({ attemptId: 'a1', artifactsDir, signal: signal(), resolveSecret: noSecrets, ...ignoreTrace });
     await engine.session!.open!(`${app.url}/login`, operation());
     const page = surfaceOf(engine)!.page();
-    await page.evaluate(() => {
+    await page.evaluate((downloadCount) => {
+      for (let index = 0; index < downloadCount; index += 1) {
       const link = document.createElement('a');
-      link.href = URL.createObjectURL(new Blob(['report body']));
-      link.download = 'report.txt';
-      link.id = 'download';
+      link.href = URL.createObjectURL(new Blob([`report body ${index}`]));
+      link.download = `report-${index}.txt`;
+      link.id = `download-${index}`;
       link.textContent = 'Download';
       document.body.append(link);
-    });
+      }
+    }, count);
     const attached: string[] = [];
     const browser = engine.fixtures!['browser']!({
       operation: () => operation(),
@@ -97,15 +99,31 @@ describe.each<BrowserProviderScope>(['worker', 'attempt'])('downloads through a 
       attachArtifact: (_kind: string, relative: string) => attached.push(relative),
     } as unknown as EngineFixtureContext) as Browser;
 
-    const file = await browser.waitForDownload(() => page.locator('#download').click());
-
-    expect(file.suggestedFilename).toBe('report.txt');
-    expect(file.path).toMatch(/^downloads\/\d{3}-report\.txt$/);
-    expect(readFileSync(path.join(artifactsDir, file.path), 'utf8')).toBe('report body');
-    expect(attached).toEqual([file.path]);
-    expect(reads).toHaveLength(1);
-    expect(reads[0]!.lease).toBe('lease-1');
-    expect(path.dirname(reads[0]!.file)).toBe(path.join(remoteDisk, 'downloads'));
-    expect(readdirSync(path.join(remoteDisk, 'downloads'))).toEqual([path.basename(reads[0]!.file)]);
+    let triggers = 0;
+    const trigger = async (): Promise<void> => {
+      triggers += 1;
+      for (let index = 0; index < count; index += 1) await page.locator(`#download-${index}`).click();
+    };
+    const files = count === 1
+      ? [await browser.waitForDownload(trigger)]
+      : await browser.waitForDownloads(trigger, { count });
+    expect(triggers).toBe(1);
+    expect(files).toHaveLength(count);
+    for (const [index, file] of files.entries()) {
+      expect(file.suggestedFilename).toBe(`report-${index}.txt`);
+      if (count > 1) expect(file).toHaveProperty('absolutePath', expect.any(String));
+      if ('absolutePath' in file && typeof file.absolutePath === 'string') {
+        expect(path.isAbsolute(file.absolutePath)).toBe(true);
+        expect(file.absolutePath).toBe(path.join(artifactsDir, file.path));
+        expect(readFileSync(file.absolutePath, 'utf8')).toBe(`report body ${index}`);
+      }
+      expect(file.path).toMatch(/^downloads\/\d{3}-report-\d\.txt$/);
+      expect(readFileSync(path.join(artifactsDir, file.path), 'utf8')).toBe(`report body ${index}`);
+    }
+    expect(attached).toEqual(files.map(file => file.path));
+    expect(reads).toHaveLength(count);
+    expect(reads.every(read => read.lease === 'lease-1')).toBe(true);
+    expect(reads.every(read => path.dirname(read.file) === path.join(remoteDisk!, 'downloads'))).toBe(true);
+    expect(readdirSync(path.join(remoteDisk, 'downloads')).toSorted()).toEqual(reads.map(read => path.basename(read.file)).toSorted());
   });
 });

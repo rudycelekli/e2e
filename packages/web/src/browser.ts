@@ -252,6 +252,11 @@ export interface Browser extends Expectable<BrowserExpectation> {
     trigger: () => Promise<void>,
     options?: { timeout?: number },
   ): Promise<{ path: string; suggestedFilename: string }>;
+  /** Runs one trigger and waits for the requested number of completed downloads. */
+  waitForDownloads(
+    trigger: () => Promise<void>,
+    options: { count: number; timeout?: number },
+  ): Promise<readonly { path: string; absolutePath: string; suggestedFilename: string }[]>;
   /** Viewport-level keyboard, for whatever has focus. */
   readonly keyboard: {
     /** Sends one key. */
@@ -609,6 +614,56 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
         return translated;
       }, 'test-code');
     },
+    async waitForDownloads(trigger, options) {
+      rejectUnknownOptions('browser.waitForDownloads', options, ['count', 'timeout']);
+      const count = options?.count;
+      if (!Number.isSafeInteger(count) || count < 1) {
+        throw new TestError('INVALID_ARGUMENT', 'waitForDownloads: count must be a positive safe integer');
+      }
+      const operation = context.operation(options.timeout);
+      let triggerFailure: { cause: unknown } | undefined;
+      return surface.guard(operation, 'downloads', async (currentOperation) => {
+        const page = surface.requirePage();
+        const remote = surface.remoteDownloads();
+        if (remote !== undefined) await saveDownloadsTo(page, remote.dir);
+        const collected: Download[] = [];
+        let complete!: (downloads: Download[]) => void;
+        const received = new Promise<Download[]>((resolve) => { complete = resolve; });
+        const onDownload = (download: Download): void => {
+          if (collected.length >= count) return;
+          collected.push(download);
+          if (collected.length === count) complete(collected);
+        };
+        page.on('download', onDownload);
+        const removeListener = (): void => { page.off('download', onDownload); };
+        const waiter = raceAbort(
+          withTimeout(received, currentOperation.timeoutMs, () =>
+            new TestError('ACTION_FAILED', `waitForDownloads: ${collected.length} of ${count} downloads started within ${currentOperation.timeoutMs}ms`)),
+          currentOperation.signal,
+          'waitForDownloads',
+        );
+        // Cleanup also happens when the trigger is still running at timeout.
+        void waiter.then(removeListener, removeListener);
+        try {
+          try { await trigger(); }
+          catch (cause) { triggerFailure = { cause }; throw cause; }
+          const downloads = await waiter;
+          const files: { path: string; absolutePath: string; suggestedFilename: string }[] = [];
+          for (const download of downloads) {
+            const suggestedFilename = download.suggestedFilename();
+            const { relative, absolute } = surface.artifactPath('downloads', suggestedFilename, '');
+            if (remote === undefined) await saveLocally(download, absolute, surface.unservedDownloads());
+            else await saveFromBrowser(download, remote, absolute, currentOperation.signal);
+            context.attachArtifact('download', relative);
+            files.push({ path: relative, absolutePath: absolute, suggestedFilename });
+          }
+          return files;
+        } finally { removeListener(); complete(collected); }
+      }, (cause, label) => {
+        if (triggerFailure !== undefined && Object.is(cause, triggerFailure.cause)) throw cause;
+        return translatePwError(cause, label);
+      }, 'test-code');
+    },
     keyboard: {
       press: (key) =>
         surface.guard(context.operation(), 'keyboard.press', () => surface.requirePage().keyboard.press(key), classifyInputError),
@@ -651,6 +706,7 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
     setViewport: action,
     onDialog: action,
     waitForDownload: { ...action, timeout: (_trigger, options) => options?.timeout },
+    waitForDownloads: { ...action, timeout: (_trigger, options) => options?.timeout },
     keyboard: { press: { ...action, label: (key) => key }, type: { ...action, label: (text) => `${text.length} chars` } },
     mouse: { move: action, wheel: action, down: action, up: action },
   });

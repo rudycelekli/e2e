@@ -328,6 +328,11 @@ export interface Browser extends Expectable<BrowserExpectation> {
     trigger: () => Promise<void>,
     options?: { timeout?: number },
   ): Promise<{ path: string; suggestedFilename: string }>;
+  /** Runs one trigger and waits for the requested number of completed downloads. */
+  waitForDownloads(
+    trigger: () => Promise<void>,
+    options: { count: number; timeout?: number },
+  ): Promise<readonly { path: string; absolutePath: string; suggestedFilename: string }[]>;
   /** Viewport-level keyboard, for whatever has focus. */
   readonly keyboard: {
     /** Sends one key. */
@@ -645,6 +650,22 @@ await off();
 
 const file = await browser.waitForDownload(() =>
   screen.getByRole('link', 'Export CSV').tap(),
+);
+```
+
+For one export action that starts several files, use
+`waitForDownloads(trigger, { count, timeout? })`. `count` must be a positive
+integer. The method calls the trigger once, waits for that many downloads,
+and saves each as a separate artifact. Results follow download-start order. Each includes `path`, `absolutePath`,
+and `suggestedFilename`; `absolutePath` names the completed runner-side file
+for reading or uploading, including after a hosted provider transfers it.
+When fewer files start before the timeout, the error reports the received
+and requested counts. Extra downloads are outside this wait.
+
+```ts
+const exports = await browser.waitForDownloads(
+  () => screen.getByRole('button', 'Export all').tap(),
+  { count: 3 },
 );
 ```
 

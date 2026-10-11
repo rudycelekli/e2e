@@ -409,6 +409,9 @@ the app opens itself (`target="_blank"`, `window.open`) is not followed:
   dismissed too, and its error fails the next step.
 - `waitForDownload(() => trigger, { timeout? })`: returns
   `{ path, suggestedFilename }`.
+- `waitForDownloads(() => trigger, { count, timeout? })`: calls the trigger once
+  and returns that many `{ path, suggestedFilename }` results in download-start order.
+  Each file is attached separately; an incomplete batch reports its count at timeout.
 - `keyboard.press(key)`, `keyboard.type(text)`, `mouse.*`: unfocused input;
   prefer `locator.press` and `locator.fill`.
 
