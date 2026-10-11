@@ -153,6 +153,13 @@ export type Cookie = CookieFields &
     | { url?: never; domain: string; path?: string }
   );
 
+/** Cookie filters are combined; strings match exactly, RegExp matches the field. */
+export interface CookieFilter {
+  name?: string | RegExp;
+  domain?: string | RegExp;
+  path?: string | RegExp;
+}
+
 export interface BrowserExpectation {
   /** Inverts the matcher. */
   readonly not: BrowserExpectation;
@@ -243,6 +250,8 @@ export interface Browser extends Expectable<BrowserExpectation> {
   cookies(): Promise<Cookie[]>;
   /** Sets cookies after URL validation. */
   setCookies(cookies: readonly Cookie[]): Promise<void>;
+  /** Removes matching cookies only; without filters removes every cookie, preserving other storage. */
+  clearCookies(options?: CookieFilter): Promise<void>;
   /** Sets the viewport size. */
   setViewport(size: { width: number; height: number }): Promise<void>;
   /** Registers an attempt-scoped dialog handler and returns an unsubscribe function. */
@@ -557,6 +566,16 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
         );
       });
     },
+    clearCookies(options) {
+      rejectUnknownOptions('browser.clearCookies', options, ['name', 'domain', 'path']);
+      for (const field of ['name', 'domain', 'path'] as const) {
+        const value = options?.[field];
+        if (value !== undefined && typeof value !== 'string' && !(value instanceof RegExp)) {
+          throw new TestError('INVALID_ARGUMENT', `browser.clearCookies ${field} must be a string or RegExp`);
+        }
+      }
+      return surface.guard(context.operation(), 'clearCookies', () => surface.requireContext().clearCookies(options));
+    },
     setViewport: (size) =>
       surface.guard(context.operation(), 'setViewport', async () => {
         await surface.setViewport(size);
@@ -648,6 +667,7 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
     waitForResponse: { ...action, timeout: (_pattern, options) => options?.timeout, label: (pattern) => String(pattern) },
     cookies: action,
     setCookies: action,
+    clearCookies: action,
     setViewport: action,
     onDialog: action,
     waitForDownload: { ...action, timeout: (_trigger, options) => options?.timeout },

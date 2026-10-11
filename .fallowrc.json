@@ -18,6 +18,7 @@
     "packages/web/tests/types/connection.ts",
     "packages/web/tests/types/init-scripts.ts",
     "packages/web/tests/types/routes.ts",
+    "packages/web/tests/types/clear-cookies.ts",
     "packages/mobile/tests/types/options.ts",
     "packages/decision/tests/types/options.ts",
     "packages/e2e/tests/live/*.ts",

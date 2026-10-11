@@ -400,6 +400,8 @@ the app opens itself (`target="_blank"`, `window.open`) is not followed:
   `json()` wait for the body (up to the action timeout) and reject with
   `ACTION_FAILED` when it could not be read.
 - `cookies()`, `setCookies([...])`: a target is an http(s) URL or a domain.
+- `clearCookies({ name?, domain?, path? })`: remove cookies matching every string
+  or RegExp filter; no options removes all cookies while preserving other storage.
 - `setViewport({ width, height })`: resize.
 - `onDialog('accept' | 'dismiss' | handler)`: awaited; resolves to an async
   unsubscribe. Register it before the tap that opens the dialog. A handler

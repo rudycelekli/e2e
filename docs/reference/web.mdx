@@ -319,6 +319,8 @@ export interface Browser extends Expectable<BrowserExpectation> {
   cookies(): Promise<Cookie[]>;
   /** Sets cookies after URL validation. */
   setCookies(cookies: readonly Cookie[]): Promise<void>;
+  /** Removes matching cookies only; without filters removes every cookie, preserving other storage. */
+  clearCookies(options?: CookieFilter): Promise<void>;
   /** Sets the viewport size. */
   setViewport(size: { width: number; height: number }): Promise<void>;
   /** Registers an attempt-scoped dialog handler and returns an unsubscribe function. */
@@ -608,6 +610,24 @@ export type Cookie = CookieFields &
 
 ```ts
 await browser.setCookies([{ url: 'http://localhost:3000', name: 'tz', value: 'UTC' }]);
+await browser.clearCookies({ name: /^session/, path: '/' });
+```
+
+### Clearing cookies
+
+`browser.clearCookies()` removes every cookie in this attempt's browser context.
+Pass `{ name?, domain?, path? }` to remove only cookies matching every supplied
+filter. A string matches the full field; a RegExp matches that field's text.
+This also removes HttpOnly cookies. Local storage, IndexedDB and session storage
+stay intact, so tests can clear a login cookie without resetting app preferences.
+Unknown filters and values other than strings or RegExp fail with `INVALID_ARGUMENT`.
+
+```ts
+export interface CookieFilter {
+  name?: string | RegExp;
+  domain?: string | RegExp;
+  path?: string | RegExp;
+}
 ```
 
 ### Dialogs and downloads

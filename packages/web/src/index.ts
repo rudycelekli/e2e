@@ -28,6 +28,7 @@ export type {
   BrowserExpectation,
   Cookie,
   CookieFields,
+  CookieFilter,
   FrameScreen,
   RouteContinueOverrides,
   RouteFulfillResponse,
