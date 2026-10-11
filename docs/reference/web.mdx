@@ -612,6 +612,11 @@ await browser.setCookies([{ url: 'http://localhost:3000', name: 'tz', value: 'UT
 
 ### Dialogs and downloads
 
+A function handler receives `type` (`alert`, `confirm`, `prompt`, or
+`beforeunload`) alongside `message`. Branch on the kind when different
+dialogs use the same message; for example, accept a prompt with input while
+dismissing a confirmation.
+
 A function handler must call `accept` or `dismiss`; one that does neither
 has the dialog dismissed and fails the next step with `APP_NOT_OPEN`, as an
 unhandled dialog does. One that throws fails the next step, or the attempt at
@@ -629,6 +634,8 @@ On a hosted browser the file comes back through the provider's
 ```ts
 /** A native dialog as a test's handler sees it. */
 export interface Dialog {
+  /** The native dialog kind, independent of its message. */
+  readonly type: 'alert' | 'confirm' | 'prompt' | 'beforeunload';
   /** The dialog's text. */
   readonly message: string;
   /** Accepts the dialog once. */

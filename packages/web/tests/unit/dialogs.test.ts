@@ -233,3 +233,29 @@ describe('ErrorLatch', () => {
     );
   });
 });
+
+describe('native dialog kind', () => {
+  it.each(['alert', 'confirm', 'prompt', 'beforeunload'] as const)('exposes %s independently of identical messages', async (kind) => {
+    const router = new DialogRouter();
+    const native = fakeDialog('same message');
+    native.dialog.type = () => kind;
+    const seen: string[] = [];
+    router.add(async dialog => { seen.push(dialog.type); await dialog.dismiss(); });
+    await router.dispatch(native.dialog);
+    expect(seen).toEqual([kind]);
+    expect(native.dismiss).toHaveBeenCalledOnce();
+    expect(() => router.throwPending()).not.toThrow();
+  });
+});
+
+describe('unknown native dialog kind', () => {
+  it('dismisses the dialog and reports an explicit engine failure', async () => {
+    const router = new DialogRouter();
+    const native = fakeDialog();
+    native.dialog.type = () => 'future-dialog';
+    router.add(dialog => dialog.accept());
+    await router.dispatch(native.dialog);
+    expect(native.dismiss).toHaveBeenCalledOnce();
+    expect(() => router.throwPending()).toThrowError(expect.objectContaining({ code: 'ENGINE_FAILURE' }));
+  });
+});

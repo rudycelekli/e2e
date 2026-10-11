@@ -403,7 +403,8 @@ the app opens itself (`target="_blank"`, `window.open`) is not followed:
 - `setViewport({ width, height })`: resize.
 - `onDialog('accept' | 'dismiss' | handler)`: awaited; resolves to an async
   unsubscribe. Register it before the tap that opens the dialog. A handler
-  gets `{ message, accept(text?), dismiss() }`, `accept` taking the prompt
+  gets `{ type, message, accept(text?), dismiss() }`, where `type` is
+  `alert`, `confirm`, `prompt`, or `beforeunload`, `accept` taking the prompt
   text; no handler, or one that neither accepts nor dismisses, fails the
   next step with `INVALID_STATE`. A throwing handler's unanswered dialog is
   dismissed too, and its error fails the next step.
