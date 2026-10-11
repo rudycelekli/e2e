@@ -336,3 +336,16 @@ describe('the TypeScript loader', () => {
     expect(await names(true)).toEqual(['other']);
   });
 });
+
+describe('cyclic directory main through the built loader', () => {
+  it('imports the directory index when package main points back to the same directory', async () => {
+    createProject({ type: 'module' });
+    write({
+      'lib/cyclic/package.json': JSON.stringify({ main: '.' }),
+      'lib/cyclic/index.ts': "export const targetName: string = 'index fallback';\n",
+      'e2e.config.ts': "import { targetName } from './lib/cyclic'; export default { targets: [{ name: targetName, platform: 'test' }] };\n",
+    });
+    const loaded = await loadConfigModule(path.join(dir, 'e2e.config.ts'), { graph: true });
+    expect(loaded.targets?.[0]?.name).toBe('index fallback');
+  });
+});

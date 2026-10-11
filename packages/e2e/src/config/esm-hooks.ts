@@ -116,13 +116,15 @@ function directoryMain(directory: string, view: ProjectView): string | undefined
  * an extensionless path leaves out, or for a directory the file its
  * package.json `main` names, else its index.
  */
-function typeScriptFile(target: string, view: ProjectView): string | undefined {
+function typeScriptFile(target: string, view: ProjectView, seen: Set<string> = new Set()): string | undefined {
+  if (seen.has(target)) return undefined;
+  seen.add(target);
   if (writtenCandidates(path.extname(target)).length > 0) return swappedFile(target, view);
   if (view.isFile(target)) return target;
   const implied = firstFile(IMPLIED_EXTENSIONS.map((extension) => `${target}${extension}`), view);
   if (implied !== undefined) return implied;
   const main = directoryMain(target, view);
-  const fromMain = main === undefined || main === target ? undefined : typeScriptFile(main, view);
+  const fromMain = main === undefined || main === target ? undefined : typeScriptFile(main, view, seen);
   return fromMain ?? firstFile(IMPLIED_EXTENSIONS.map((extension) => `${path.join(target, 'index')}${extension}`), view);
 }
 
