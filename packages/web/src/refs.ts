@@ -26,6 +26,7 @@ export class RefRegistry {
   private counter = 0;
   private capture = 0;
   private readonly located = new Map<string, ActionTarget>();
+  private readonly temporary = new Map<string, ActionTarget>();
   private observation = new Map<string, ActionTarget>();
 
   mintId(): string {
@@ -52,12 +53,26 @@ export class RefRegistry {
     return id;
   }
 
+  /** Keeps a short-lived read separate from retained refs and their eviction bound. */
+  storeTemporary(target: ActionTarget): string {
+    const id = this.mintId();
+    this.temporary.set(id, target);
+    return id;
+  }
+
+  /** Releases only the temporary read's reference, including its pinned handle. */
+  async releaseTemporary(ref: NodeRef): Promise<void> {
+    const target = this.temporary.get(ref.id);
+    this.temporary.delete(ref.id);
+    if (target?.kind === 'element') await target.element.dispose().catch(() => undefined);
+  }
+
   /**
    * Ids are the engine's; revisions are the harness's. The adapter already
    * rejected a ref from a superseded resolution, so lookup is by id alone.
    */
   lookup(ref: NodeRef): ActionTarget {
-    const target = this.located.get(ref.id) ?? this.observation.get(ref.id);
+    const target = this.located.get(ref.id) ?? this.temporary.get(ref.id) ?? this.observation.get(ref.id);
     if (target === undefined) {
       throw new EngineError('NODE_STALE', `node reference ${ref.id} is stale`, { retryable: true });
     }
@@ -87,6 +102,8 @@ export class RefRegistry {
     this.observation = new Map();
     RefRegistry.dispose(this.located);
     this.located.clear();
+    RefRegistry.dispose(this.temporary);
+    this.temporary.clear();
   }
 
   /** Disposes every element handle in one observation generation. */

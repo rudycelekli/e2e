@@ -269,9 +269,9 @@ export interface BrowserExpectation {
   toHaveURL(expected: string | RegExp, options?: { ignoreCase?: boolean; timeout?: number }): Promise<void>;
   /** Waits for the current title to match. */
   toHaveTitle(expected: TextMatch, options?: { timeout?: number }): Promise<void>;
-  /** Waits for the target's `class` attribute to match: a string is the whole normalized class list, a RegExp is tested against it. */
   /** Waits for a target's computed CSS property to match. Property names use CSS spelling. */
   toHaveCSS(target: Locator, property: string, expected: TextMatch, options?: { timeout?: number }): Promise<void>;
+  /** Waits for the target's `class` attribute to match: a string is the whole normalized class list, a RegExp is tested against it. */
   toHaveClass(target: Locator, expected: TextMatch, options?: { timeout?: number }): Promise<void>;
 }
 ```
@@ -300,7 +300,8 @@ computed style of one element. Use CSS names such as `background-color` or
 `--accent`; strings match the full computed value, and RegExp matches its text.
 Frame scopes and closed shadow roots follow the locator. A missing node keeps
 waiting for both positive and negative assertions; an ambiguous locator fails.
-The locator must belong to the current target and attempt.
+The locator must belong to the current target and attempt. Each poll releases
+its temporary node reference and pinned handle when the read completes.
 
 ```ts
 await expect(browser).toHaveCSS(screen.getByRole('button', 'Save'), 'opacity', '1');

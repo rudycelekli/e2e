@@ -30,3 +30,35 @@ describe('located element refs', () => {
     expect(first.dispose).toHaveBeenCalledTimes(1);
   });
 });
+
+
+describe('temporary located refs', () => {
+  it('release only their own pinned handles and do not evict retained refs at capacity', async () => {
+    const refs = new RefRegistry();
+    const retained = handle();
+    const retainedId = refs.storeLocated({ kind: 'element', element: retained.element });
+    for (let i = 1; i < 2048; i += 1) refs.storeLocated({ kind: 'element', element: handle().element });
+    const temporary = handle();
+    const id = refs.storeTemporary({ kind: 'element', element: temporary.element });
+    expect(refs.lookup({ id, revision: '' })).toEqual({ kind: 'element', element: temporary.element });
+    await refs.releaseTemporary({ id, revision: '' });
+    await refs.releaseTemporary({ id, revision: '' });
+    expect(temporary.dispose).toHaveBeenCalledTimes(1);
+    expect(retained.dispose).not.toHaveBeenCalled();
+    expect(refs.lookup({ id: retainedId, revision: '' }).kind).toBe('element');
+    expect(() => refs.lookup({ id, revision: '' })).toThrow(/stale/);
+    refs.clear();
+  });
+
+  it('clears temporary handles when the attempt ends', async () => {
+    const refs = new RefRegistry();
+    const temporary = handle();
+    const id = refs.storeTemporary({ kind: 'element', element: temporary.element });
+    refs.clear();
+    await Promise.resolve();
+    expect(temporary.dispose).toHaveBeenCalledTimes(1);
+    expect(() => refs.lookup({ id, revision: '' })).toThrow(/stale/);
+    await refs.releaseTemporary({ id, revision: '' });
+    expect(temporary.dispose).toHaveBeenCalledTimes(1);
+  });
+});

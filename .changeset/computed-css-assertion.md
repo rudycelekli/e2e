@@ -5,3 +5,5 @@
 ---
 
 Add the target-owned locator-expression fixture accessor and web computed-CSS assertions with scoped locator polling.
+
+Release computed-style poll references and pinned handles without evicting retained located references.

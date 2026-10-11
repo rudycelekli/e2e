@@ -68,6 +68,7 @@ import {
   sanitizeFilename,
   staleOr,
   translatePwError,
+  type ActionTarget,
 } from './support.ts';
 
 /** Browser launch budget when the harness init budget is not otherwise expressed. */
@@ -723,7 +724,7 @@ export class PlaywrightSurface {
    * `visible` query drops the candidates whose hidden state the same read
    * reported before either of those, so a position is among shown matches.
    */
-  locate(expression: LocatorExpression, operation: OperationContext): Promise<readonly SemanticNode[]> {
+  locate(expression: LocatorExpression, operation: OperationContext, temporary = false): Promise<readonly SemanticNode[]> {
     return this.guard(
       operation,
       'locate',
@@ -810,9 +811,8 @@ export class PlaywrightSurface {
           // ambiguous between locate and perform is stale instead of acting
           // on whichever element is first.
           const locator = reads.length === 1 ? projected.locator : projected.locator.nth(index);
-          const id = refs.storeLocated(
-            pinned === undefined ? { kind: 'locator', locator } : { kind: 'element', element: pinned },
-          );
+          const target: ActionTarget = pinned === undefined ? { kind: 'locator', locator } : { kind: 'element', element: pinned };
+          const id = temporary ? refs.storeTemporary(target) : refs.storeLocated(target);
           return inFrame(toSemanticNode({ id, revision: '' }, raw), frame);
         });
       },
@@ -823,19 +823,23 @@ export class PlaywrightSurface {
   /** Reads computed CSS from the exact single resolved target, including frames and closed roots. */
   readComputedStyle(expression: LocatorExpression, property: string, operation: OperationContext): Promise<string | undefined> {
     return this.guard(operation, 'computed style', async (currentOperation) => {
-      const nodes = await this.locate(expression, currentOperation);
-      if (nodes.length === 0) return undefined;
-      if (nodes.length !== 1) throw new TestError('LOCATOR_AMBIGUOUS', 'computed style requires exactly one node');
       const session = this.requireSession();
-      const generation = session.token();
-      const target = session.refs.lookup(nodes[0]!.ref as NodeRef);
-      const read = (element: Element, name: string): string =>
-        element.ownerDocument.defaultView!.getComputedStyle(element).getPropertyValue(name);
-      const value = await (target.kind === 'element'
-        ? target.element.evaluate(read, property)
-        : target.locator.evaluate(read, property));
-      session.check(generation);
-      return value;
+      const nodes = await this.locate(expression, currentOperation, true);
+      try {
+        if (nodes.length === 0) return undefined;
+        if (nodes.length !== 1) throw new TestError('LOCATOR_AMBIGUOUS', 'computed style requires exactly one node');
+        const generation = session.token();
+        const target = session.refs.lookup(nodes[0]!.ref as NodeRef);
+        const read = (element: Element, name: string): string =>
+          element.ownerDocument.defaultView!.getComputedStyle(element).getPropertyValue(name);
+        const value = await (target.kind === 'element'
+          ? target.element.evaluate(read, property)
+          : target.locator.evaluate(read, property));
+        session.check(generation);
+        return value;
+      } finally {
+        await Promise.all(nodes.map((node) => session.refs.releaseTemporary(node.ref as NodeRef)));
+      }
     });
   }
 

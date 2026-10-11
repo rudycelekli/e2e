@@ -13,12 +13,17 @@ test('computed styles follow actual scope', async ({app,browser,screen}) => {
   const button=document.createElement('button');button.textContent='Styled';button.id='styled';button.style.color='rgb(1, 2, 3)';button.style.setProperty('--accent','ready');document.body.append(button);
   const host=document.createElement('div');document.body.append(host);const root=host.attachShadow({mode:'closed'});root.innerHTML='<button style="opacity:0.5">Shadow</button>';
   const frame=document.createElement('iframe');frame.srcdoc='<button style="margin-left:9px">Frame</button>';document.body.append(frame);
-  setTimeout(()=>button.style.opacity='0.75',80);
  });
  const styled=screen.getByRole('button','Styled');previous=styled;
  await expect(browser).toHaveCSS(styled,'color','rgb(1, 2, 3)');
  await expect(browser).toHaveCSS(styled,'--accent',/ready/);
- await expect(browser).toHaveCSS(styled,'opacity','0.75');
+ await browser.evaluate(() => {
+  const button=document.getElementById('styled')!;button.style.opacity='0.25';
+  setTimeout(()=>button.style.opacity='0.75',500);
+ });
+ const began=Date.now();
+ await expect(browser).toHaveCSS(styled,'opacity','0.75',{timeout:2000});
+ expect(Date.now()-began).toBeGreaterThanOrEqual(200);
  await expect(browser).not.toHaveCSS(styled,'opacity','1');
  await expect(browser).toHaveCSS(screen.getByRole('button','Shadow'),'opacity','0.5');
  await expect(browser).toHaveCSS(browser.frameLocator('iframe').getByRole('button','Frame'),'margin-left','9px');
