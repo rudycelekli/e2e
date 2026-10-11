@@ -336,3 +336,12 @@ describe('the TypeScript loader', () => {
     expect(await names(true)).toEqual(['other']);
   });
 });
+
+describe('percent-encoded source extensions through the built loader', () => {
+  it('compiles JSX reached through an encoded extension in a real config import', async () => {
+    createProject({ type: 'module' });
+    write({ 'e2e.config.ts': "import { view } from './lib/view%2Etsx'; export default { targets: [{ name: view(), platform: 'test' }] };\n" });
+    const loaded = await loadConfigModule(path.join(dir, 'e2e.config.ts'), { graph: true });
+    expect(loaded.targets?.[0]?.name).toBe('<b>jsx</b>');
+  });
+});

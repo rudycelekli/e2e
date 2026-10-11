@@ -6,6 +6,8 @@
 - ES modules: `.ts` config, tests, helpers, and workspace packages exporting
   `.ts` source load as ESM regardless of the nearest `package.json` `type`
   (CommonJS packages need no change); never `require` or `module.exports`.
+  Percent-encoded file URL imports keep these source rules (`./view%2Etsx`
+  loads `view.tsx` with the project JSX settings).
   Imports follow TypeScript: `./x.js` or `./x` loads `x.ts`, and the nearest
   `tsconfig.json` `paths` and `baseUrl` apply. Decorators need
   `experimentalDecorators`; CommonJS TypeScript goes in `.cts`.

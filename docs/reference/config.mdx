@@ -87,7 +87,8 @@ resolves the way TypeScript resolves it: `./helper.js` and `./helper` load
 a `#` import or package export that names a missing `./x.js`, `./x.jsx`, or
 `./x` loads its `x.ts` or `x.tsx` source when imported (a `require()` of it fails as Node.js reports
 it). An import written in a JavaScript file resolves
-as Node.js resolves it.
+as Node.js resolves it. Percent-encoded file URL imports follow the same
+source rules: `./view%2Etsx` loads `view.tsx` with the project's JSX settings.
 
 The `tsconfig.json` is the nearest one above the file, or, when that one has
 `references` and does not include the file itself (as Vite writes it), the

@@ -56,8 +56,9 @@ export interface CompiledSource {
 export function compiledSource(url: string | undefined): CompiledSource | undefined {
   if (url?.startsWith('file:') !== true) return undefined;
   const parsed = new URL(url);
-  const kind = COMPILED[path.extname(parsed.pathname)];
-  return kind === undefined ? undefined : { file: fileURLToPath(parsed), kind, project: isProjectFile(parsed) };
+  const file = fileURLToPath(parsed);
+  const kind = COMPILED[path.extname(file)];
+  return kind === undefined ? undefined : { file, kind, project: isProjectFile(parsed) };
 }
 
 /**
