@@ -2081,3 +2081,23 @@ describe('deterministic actions', () => {
   });
 });
 
+
+describe('coordinate swipe quiet waits', () => {
+  it.each([undefined, 400])('forwards configured settle to agent swipe duration %s', async (durationMs) => {
+    const h = harness({ settle: 600 });
+    await openAttempt(h);
+    await h.engine.performAt!({ x: 10, y: 20 }, { kind: 'swipeTo', target: { x: 30, y: 300 }, ...(durationMs === undefined ? {} : { durationMs }) }, operation());
+    const args = h.fake.lastArgs(durationMs === undefined ? 'interactions.swipe' : 'interactions.pan');
+    expect(args).toMatchObject({ settle: true, settleQuietMs: 600 });
+    if (durationMs === undefined) expect(args).toEqual({ from: { x: 10, y: 20 }, to: { x: 30, y: 300 }, settle: true, settleQuietMs: 600 });
+    else expect(args).toEqual({ x: 10, y: 20, dx: 20, dy: 280, durationMs: 400, settle: true, settleQuietMs: 600 });
+  });
+  it.each([undefined, 400])('respects settle:false for agent swipe duration %s', async (durationMs) => {
+    const h = harness({ settle: false });
+    await openAttempt(h);
+    await h.engine.performAt!({ x: 10, y: 20 }, { kind: 'swipeTo', target: { x: 30, y: 300 }, ...(durationMs === undefined ? {} : { durationMs }) }, operation());
+    const args = h.fake.lastArgs(durationMs === undefined ? 'interactions.swipe' : 'interactions.pan');
+    expect(args).not.toHaveProperty('settle');
+    expect(args).not.toHaveProperty('settleQuietMs');
+  });
+});

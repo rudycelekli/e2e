@@ -79,9 +79,10 @@ export function pointerInteraction(
           dx: to.x - at.x,
           dy: to.y - at.y,
           durationMs: action.durationMs,
+          ...settle,
         });
       }
-      return client.interactions.swipe({ from: at, to });
+      return client.interactions.swipe({ from: at, to, ...settle });
     }
     case 'secondaryTap':
     case 'hover':
