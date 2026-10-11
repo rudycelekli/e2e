@@ -119,7 +119,8 @@ What the app logged, oldest first, with the step it happened in.
 An assertion that read one value the whole time has a wrong expectation, or
 the app never reached that state: look in the app log for a failed request.
 An assertion whose readings changed (`"2 remaining" x3 -> at 410ms "1
-remaining"`) raced the app. `screen: unchanged` after an action means the
+remaining"`) raced the app. Long polls keep the first reading and latest three,
+with `…` marking omitted readings. `screen: unchanged` after an action means the
 action had no visible effect. On web, a step's screen is the one an action
 left. On a device, it's the screen the step acted on.
 

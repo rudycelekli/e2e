@@ -38,6 +38,7 @@ export class SampleHistory {
   private readonly startedMs = Date.now();
   private readonly runs: Run[] = [];
   private reads = 0;
+  private omitted = false;
 
   /** Adds one round's reading. */
   add(value: string): void {
@@ -46,7 +47,13 @@ export class SampleHistory {
     const redacted = this.redact(value);
     const last = this.runs.at(-1);
     if (last?.value === redacted) last.count += 1;
-    else this.runs.push({ value: redacted, count: 1, atMs: Date.now() - this.startedMs });
+    else {
+      this.runs.push({ value: redacted, count: 1, atMs: Date.now() - this.startedMs });
+      if (this.runs.length > MAX_RUNS) {
+        this.runs.splice(1, 1);
+        this.omitted = true;
+      }
+    }
   }
 
   /**
@@ -68,9 +75,8 @@ export class SampleHistory {
   }
 
   private detail(): string {
-    const shown = this.runs.length <= MAX_RUNS ? this.runs : [this.runs[0]!, ...this.runs.slice(-(MAX_RUNS - 1))];
-    const parts = shown.map((run, index) => {
-      const skipped = index === 1 && shown.length < this.runs.length ? '… -> ' : '';
+    const parts = this.runs.map((run, index) => {
+      const skipped = index === 1 && this.omitted ? '… -> ' : '';
       const at = index === 0 ? '' : `at ${run.atMs}ms `;
       return `${skipped}${at}${bound(run.value, MAX_VALUE_CHARS)}${run.count > 1 ? ` x${run.count}` : ''}`;
     });
