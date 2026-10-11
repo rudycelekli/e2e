@@ -283,3 +283,21 @@ describe('Copilot endpoint selection', () => {
     expect(api.requests.filter((request) => request.url === '/models')).toHaveLength(1);
   });
 });
+
+describe('Copilot CLI login cancellation', () => {
+  it('does not read a CLI token for an already cancelled login', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    let reads = 0;
+    const provider = createCopilotProvider({ githubCliToken: async () => { reads += 1; return 'gho-local'; } });
+    await expect(provider.login({ signal: controller.signal, onAuth() {}, onPrompt: async () => '' })).rejects.toMatchObject({ code: 'CANCELLED' });
+    expect(reads).toBe(0);
+  });
+  it('does not accept a token read after cancellation', async () => {
+    const controller = new AbortController();
+    const provider = createCopilotProvider({ githubCliToken: async () => { controller.abort(); return 'gho-local'; } });
+    let progress = 0;
+    await expect(provider.login({ signal: controller.signal, onAuth() {}, onPrompt: async () => '', onProgress: () => { progress += 1; } })).rejects.toMatchObject({ code: 'CANCELLED' });
+    expect(progress).toBe(0);
+  });
+});

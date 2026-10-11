@@ -73,6 +73,7 @@ export function createCopilotProvider(options: CopilotProviderOptions = {}): OAu
     id: 'github-copilot',
     name: 'GitHub Copilot',
     async login(callbacks, loginOptions = {}) {
+      if (callbacks.signal?.aborted) throw new OAuthError('CANCELLED', 'the login was cancelled');
       const enterprise = loginOptions.enterpriseUrl === undefined ? undefined : enterpriseHost(loginOptions.enterpriseUrl);
       const stored = enterprise === undefined ? {} : { enterpriseUrl: enterprise };
       if (loginOptions.clientId !== undefined && loginOptions.fromGitHubCli !== true) {
@@ -87,6 +88,7 @@ export function createCopilotProvider(options: CopilotProviderOptions = {}): OAu
         return { access: tokens.access_token, refresh: '', expires: 0, ...stored };
       }
       const token = await cliToken(enterprise);
+      if (callbacks.signal?.aborted) throw new OAuthError('CANCELLED', 'the login was cancelled');
       if (token === undefined) {
         throw new OAuthError(
           'MISCONFIGURED',
