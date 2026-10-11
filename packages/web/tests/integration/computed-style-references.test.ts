@@ -16,6 +16,7 @@ it('releases real pinned CSS reads and ambiguous matches at retained-reference c
   const app = await startFixtureApp();
   const artifactsDir = mkdtempSync(path.join(tmpdir(), 'e2e-css-refs-'));
   const surface = new PlaywrightSurface({});
+  const originalLocated = RefRegistry.prototype.storeLocated;
   const stored = vi.spyOn(RefRegistry.prototype, 'storeLocated');
   try {
     await surface.init({ runId: 'css-refs', targetName: 'web', projectRoot: process.cwd(), app: { site: '127.0.0.1' }, env: {}, headed: false, workerSlot: 0, signal: new AbortController().signal, log: () => undefined });
@@ -30,7 +31,7 @@ it('releases real pinned CSS reads and ambiguous matches at retained-reference c
     for (let i = 1; i < 2048; i += 1) refs.storeLocated({ kind: 'locator', locator: surface.requirePage().locator('#styled') });
     stored.mockClear();
     const method = typeof RefRegistry.prototype.storeTemporary === 'function' ? 'storeTemporary' : 'storeLocated';
-    const original = RefRegistry.prototype[method];
+    const original = method === 'storeLocated' ? originalLocated : RefRegistry.prototype[method];
     const disposals: ReturnType<typeof vi.fn>[] = [];
     const temporaryIds: string[] = [];
     vi.spyOn(RefRegistry.prototype, method).mockImplementation(function (this: InstanceType<typeof RefRegistry>, target) {
