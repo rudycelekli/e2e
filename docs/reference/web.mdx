@@ -332,6 +332,10 @@ export interface Browser extends Expectable<BrowserExpectation> {
   readonly keyboard: {
     /** Sends one key. */
     press(key: string): Promise<void>;
+    /** Holds a key or modifier until up, with repeat on another down. */
+    down(key: string): Promise<void>;
+    /** Releases a held key. */
+    up(key: string): Promise<void>;
     /** Types plain text. */
     type(text: string): Promise<void>;
   };

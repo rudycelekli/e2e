@@ -256,6 +256,10 @@ export interface Browser extends Expectable<BrowserExpectation> {
   readonly keyboard: {
     /** Sends one key. */
     press(key: string): Promise<void>;
+    /** Holds one key until up; repeated down calls send a repeat event. */
+    down(key: string): Promise<void>;
+    /** Releases a held key. */
+    up(key: string): Promise<void>;
     /** Types plain text. */
     type(text: string): Promise<void>;
   };
@@ -610,6 +614,10 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
       }, 'test-code');
     },
     keyboard: {
+      down: (key) =>
+        surface.guard(context.operation(), 'keyboard.down', () => surface.requirePage().keyboard.down(key), classifyInputError),
+      up: (key) =>
+        surface.guard(context.operation(), 'keyboard.up', () => surface.requirePage().keyboard.up(key), classifyInputError),
       press: (key) =>
         surface.guard(context.operation(), 'keyboard.press', () => surface.requirePage().keyboard.press(key), classifyInputError),
       type: (text) =>
@@ -651,7 +659,7 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
     setViewport: action,
     onDialog: action,
     waitForDownload: { ...action, timeout: (_trigger, options) => options?.timeout },
-    keyboard: { press: { ...action, label: (key) => key }, type: { ...action, label: (text) => `${text.length} chars` } },
+    keyboard: { down: { ...action, label: (key) => key }, up: { ...action, label: (key) => key }, press: { ...action, label: (key) => key }, type: { ...action, label: (text) => `${text.length} chars` } },
     mouse: { move: action, wheel: action, down: action, up: action },
   });
 }

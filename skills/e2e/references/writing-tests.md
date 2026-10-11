@@ -409,8 +409,10 @@ the app opens itself (`target="_blank"`, `window.open`) is not followed:
   dismissed too, and its error fails the next step.
 - `waitForDownload(() => trigger, { timeout? })`: returns
   `{ path, suggestedFilename }`.
-- `keyboard.press(key)`, `keyboard.type(text)`, `mouse.*`: unfocused input;
-  prefer `locator.press` and `locator.fill`.
+- `keyboard.press(key)`, `keyboard.type(text)`, `keyboard.down(key)`,
+  `keyboard.up(key)`, `mouse.*`: unfocused input. Only `down(key)` holds a
+  key or modifier until `up(key)`. `press(key)` presses and releases within
+  the call. Prefer `locator.press` and `locator.fill`.
 
 A `route`, `unroute`, or `waitForResponse` pattern is a glob string or
 `RegExp` matched against the full URL (`*` stays within one path segment,
