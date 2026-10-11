@@ -402,7 +402,8 @@ the app opens itself (`target="_blank"`, `window.open`) is not followed:
 - `cookies()`, `setCookies([...])`: a target is an http(s) URL or a domain.
 - `setViewport({ width, height })`: resize.
 - `setOffline(true | false)`: emulate network loss or restoration for this
-  attempt, retained through page/context replacement and CDP recovery. Restore
+  attempt, retained through page/context replacement and CDP recovery. Opening
+  another tab during the change keeps the setting in the same context. Restore
   online before restarting an app that needs the network; caches may still serve requests.
 - `onDialog('accept' | 'dismiss' | handler)`: awaited; resolves to an async
   unsubscribe. Register it before the tap that opens the dialog. A handler

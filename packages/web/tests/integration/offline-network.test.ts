@@ -1,4 +1,4 @@
-import {it,expect} from 'vitest';
+import {it,expect,vi} from 'vitest';
 import {mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
@@ -46,3 +46,23 @@ it('reapplies explicit offline state after a real CDP drop and host network rese
  expect(await browser.evaluate(async()=> (await fetch('/?restored',{cache:'no-store'})).ok)).toBe(true);
  }finally{await engine.dispose!(cleanup());await closeRemoteChrome(remote);await app.close();rmSync(dir,{recursive:true,force:true});}
 },60000);
+
+it('keeps an actual offline change while its context opens a replacement tab',async()=>{
+ const app=await startFixtureApp();const dir=mkdtempSync(path.join(tmpdir(),'e2e-offline-tab-'));const engine=web();
+ let release!:()=>void;const held=new Promise<void>(resolve=>{release=resolve;});
+ let applied!:()=>void;const appliedState=new Promise<void>(resolve=>{applied=resolve;});
+ let changing:Promise<void>|undefined;
+ try {
+ await init(engine,dir,app.url);const surface=surfaceOf(engine)!;const context=surface.context();
+ await surface.page().close();
+ const setOffline=context.setOffline.bind(context);
+ const spy=vi.spyOn(context,'setOffline').mockImplementation(async offline=>{await setOffline(offline);applied();await held;});
+ changing=fixture(engine,app.url).setOffline(true);
+ await appliedState;
+ await engine.session!.open!('about:blank',op());expect(surface.context()).toBe(context);
+ release();await changing;spy.mockRestore();
+ expect(await surface.page().evaluate(()=>navigator.onLine)).toBe(false);
+ await engine.session!.reset!(op());
+ expect(await surface.page().evaluate(()=>navigator.onLine)).toBe(false);
+ }finally{release();await changing?.catch(()=>undefined);vi.restoreAllMocks();await engine.dispose!(cleanup());await app.close();rmSync(dir,{recursive:true,force:true});}
+},30000);

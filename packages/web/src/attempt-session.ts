@@ -243,9 +243,11 @@ export class AttemptSession {
 
   /** Remembers only successfully applied network state for this attempt's future bindings. */
   async setOffline(offline: boolean): Promise<void> {
-    const token = this.token();
-    await this.current().context.setOffline(offline);
-    this.check(token);
+    const context = this.current().context;
+    await context.setOffline(offline);
+    if (this.state.kind !== 'ready' || this.state.binding.context !== context) {
+      throw new EngineError('NODE_STALE', 'the connection changed while setting network state', { retryable: true });
+    }
     this.requestedOffline = offline;
   }
 

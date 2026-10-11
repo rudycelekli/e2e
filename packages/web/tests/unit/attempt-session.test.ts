@@ -166,6 +166,42 @@ describe('AttemptSession', () => {
     await owner.close(cleanup());
   });
 
+  it('accepts applied offline state when only the page generation changed', async () => {
+    const current = remote('current');
+    current.pages.push(target('page').page);
+    vi.mocked(connectCdp).mockResolvedValue(current.browser);
+    const owner = session();
+    await owner.start(new AbortController().signal);
+    const applied = deferred<void>();
+    const context = owner.current().context;
+    Object.assign(context, { setOffline: vi.fn(() => applied.promise) });
+    const changing = owner.setOffline(true);
+    await owner.ensurePage();
+    expect(owner.current().context).toBe(context);
+    applied.resolve();
+    await expect(changing).resolves.toBeUndefined();
+    await owner.close(cleanup());
+  });
+
+  it('rejects late offline completion after its context was replaced', async () => {
+    const applied = deferred<void>();
+    const old = { close: vi.fn(async () => undefined), setOffline: vi.fn(() => applied.promise) };
+    const next = { close: vi.fn(async () => undefined), setOffline: vi.fn(async () => undefined) };
+    const newContext = vi.fn().mockResolvedValueOnce(old).mockResolvedValue(next);
+    const owner = new AttemptSession({
+      artifactsDir: tmpdir(), viewport: null, contextOptions: {}, screencast: {},
+      acquire: async () => ({ newContext }) as unknown as Browser,
+      configure: async () => undefined,
+    });
+    await owner.start(new AbortController().signal);
+    const changing = expect(owner.setOffline(true)).rejects.toMatchObject({ code: 'NODE_STALE' });
+    await owner.replace(undefined, operation());
+    applied.resolve();
+    await changing;
+    expect(next.setOffline).not.toHaveBeenCalled();
+    await owner.close(cleanup());
+  });
+
   it('does not attach an endpoint that resolves after disposal', async () => {
     const endpoint = deferred<string>();
     const provision = vi.fn(() => endpoint.promise);

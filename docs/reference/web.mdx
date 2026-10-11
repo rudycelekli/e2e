@@ -360,7 +360,7 @@ export interface Browser extends Expectable<BrowserExpectation> {
 | `goto`, `reload`, `back`, `forward` | `config.timeout`, 120000 ms, the same budget `app.open()` uses; `{ timeout }` overrides, capped by the test deadline |
 | `waitForResponse`, `waitForDownload` | `config.actionTimeout`, 30000 ms; `{ timeout }` overrides, capped by the test deadline |
 | `waitForURL` | `config.assertionTimeout`, 5000 ms |
-| `url`, `title`, `evaluate`, `addInitScript`, `route`, `unroute`, `cookies`, `setCookies`, `setViewport`, `onDialog`, `keyboard.*`, `mouse.*` | `config.actionTimeout`, 30000 ms, not overridable |
+| `url`, `title`, `evaluate`, `addInitScript`, `route`, `unroute`, `cookies`, `setCookies`, `setViewport`, `setOffline`, `onDialog`, `keyboard.*`, `mouse.*` | `config.actionTimeout`, 30000 ms, not overridable |
 
 Every `browser` call is a recorded `browser.<method>` step, except `locator` and
 `frameLocator`: they build a locator without touching the page, and the
@@ -402,7 +402,9 @@ within this attempt. Restarting or clearing state also navigates the app, so tha
 navigation can fail while offline; restore network access before reopening an
 app that needs the network. A new ordinary attempt starts with its own online
 context. When attaching to a dedicated persistent browser, its original network
-state is left alone until this attempt explicitly calls `setOffline`.
+state is left alone until this attempt explicitly calls `setOffline`. Opening or
+replacing a tab while the network change completes keeps the applied state when
+the browser context is unchanged.
 
 ### Locators and frames
 
