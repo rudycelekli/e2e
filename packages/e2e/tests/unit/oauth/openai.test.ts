@@ -244,7 +244,7 @@ describe('Codex requests', () => {
       };
       const call = { type: 'function_call', id: 'fc_1', call_id: 'call_1', name: 'report', arguments: '{"color":"red"}', status: 'completed' };
       // As the Codex backend answers: no content-type, items streamed one by one, an empty output on the final event.
-      response.writeHead(200);
+      response.writeHead(200, { 'x-request-id': 'local-trace', 'x-ratelimit-remaining-requests': '7' });
       response.write(`event: response.created\ndata: ${JSON.stringify({ type: 'response.created', response: { id: 'resp_1' } })}\n\n`);
       response.write(`event: response.output_item.done\ndata: ${JSON.stringify({ type: 'response.output_item.done', output_index: 0, item: call })}\n\n`);
       response.write(`event: response.completed\ndata: ${JSON.stringify({ type: 'response.completed', response: completed })}\n\n`);
@@ -262,6 +262,8 @@ describe('Codex requests', () => {
     });
     expect(result.toolCalls[0]).toMatchObject({ toolName: 'report', input: { color: 'red' } });
     expect(result.usage.inputTokens).toBe(10);
+    expect(result.response.headers?.['x-request-id']).toBe('local-trace');
+    expect(result.response.headers?.['x-ratelimit-remaining-requests']).toBe('7');
     const body = JSON.parse(seen!.body) as Record<string, unknown>;
     expect(body['stream']).toBe(true);
     expect(body['store']).toBe(false);

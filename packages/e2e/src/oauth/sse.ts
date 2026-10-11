@@ -58,7 +58,7 @@ export async function foldResponsesStream(response: Response): Promise<Response>
       items.set(record['output_index'], record['item']);
     }
     if (record['type'] === 'response.completed' || record['type'] === 'response.incomplete') {
-      return json(200, withOutput(record['response'], items));
+      return json(200, withOutput(record['response'], items), response.headers);
     }
     if (record['type'] === 'response.failed') {
       const inner = record['response'] as Record<string, unknown> | undefined;
@@ -67,8 +67,8 @@ export async function foldResponsesStream(response: Response): Promise<Response>
       failure = { message: record['message'] ?? 'the response failed', code: record['code'] };
     }
   }
-  if (failure !== undefined) return json(400, { error: failure });
-  return json(502, { error: { message: 'the stream ended without a completed response' } });
+  if (failure !== undefined) return json(400, { error: failure }, response.headers);
+  return json(502, { error: { message: 'the stream ended without a completed response' } }, response.headers);
 }
 
 /** The final response with the streamed items as its `output` when the event itself carried none. */
@@ -80,6 +80,14 @@ function withOutput(response: unknown, items: ReadonlyMap<number, unknown>): unk
   return { ...record, output };
 }
 
-function json(status: number, body: unknown): Response {
-  return new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+/** Builds the folded body while preserving upstream diagnostics, excluding replaced entity metadata. */
+function json(status: number, body: unknown, upstreamHeaders: Headers): Response {
+  const headers = new Headers(upstreamHeaders);
+  for (const name of upstreamHeaders.get('connection')?.split(',') ?? []) {
+    const token = name.trim();
+    if (/^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/.test(token)) headers.delete(token);
+  }
+  for (const name of ['content-length', 'content-encoding', 'transfer-encoding', 'etag', 'digest', 'content-md5', 'connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'upgrade']) headers.delete(name);
+  headers.set('content-type', 'application/json');
+  return new Response(JSON.stringify(body), { status, headers });
 }

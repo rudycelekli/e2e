@@ -78,3 +78,51 @@ describe('foldResponsesStream', () => {
     expect(parseSse('event: a\r\ndata: 1\r\ndata: 2\r\n\r\ndata: {"b":1}\r\n\r\n')).toEqual([{ event: 'a', data: '1\n2' }, { data: '{"b":1}' }]);
   });
 });
+
+it('preserves upstream diagnostics but removes metadata for replaced stream bytes', async () => {
+  const original = sse([{ data: { type: 'response.completed', response: completed } }], {
+    'content-type': 'text/event-stream', 'x-request-id': 'local-request', 'x-ratelimit-remaining-requests': '7',
+    'content-length': '9999', 'content-encoding': 'gzip', 'transfer-encoding': 'chunked', etag: 'stream-etag', digest: 'stream-digest', 'content-md5': 'stream-checksum',
+  });
+  const folded = await foldResponsesStream(original);
+  expect(folded.headers.get('x-request-id')).toBe('local-request');
+  expect(folded.headers.get('x-ratelimit-remaining-requests')).toBe('7');
+  expect(folded.headers.get('content-type')).toBe('application/json');
+  for (const name of ['content-length', 'content-encoding', 'transfer-encoding', 'etag', 'digest', 'content-md5']) expect(folded.headers.has(name)).toBe(false);
+  expect(original.headers.get('content-length')).toBe('9999');
+  expect(await folded.json()).toEqual(completed);
+});
+
+it('removes connection headers and nominated fields from successful and failed folds', async () => {
+  for (const failed of [false, true]) {
+    const payload = failed ? { type: 'response.failed', response: { error: { message: 'local failure', code: 'local_error' } } } : { type: 'response.completed', response: completed };
+    const original = sse([{ data: payload }], {
+      'x-request-id': 'local-diagnostic', 'x-ratelimit-remaining-requests': '8',
+      connection: 'keep-alive, X-Private-Hop', 'keep-alive': 'timeout=5', 'x-private-hop': 'upstream-only',
+      'proxy-authenticate': 'upstream', 'proxy-authorization': 'local-only', te: 'trailers', trailer: 'digest', upgrade: 'h2c',
+      'content-length': '999', 'content-encoding': 'gzip', 'transfer-encoding': 'chunked', etag: 'upstream', digest: 'upstream', 'content-md5': 'upstream',
+    });
+    const folded = await foldResponsesStream(original);
+    expect(folded.status).toBe(failed ? 400 : 200);
+    expect(folded.headers.get('x-request-id')).toBe('local-diagnostic');
+    expect(folded.headers.get('x-ratelimit-remaining-requests')).toBe('8');
+    expect(folded.headers.get('content-type')).toBe('application/json');
+    for (const name of ['connection', 'keep-alive', 'x-private-hop', 'proxy-authenticate', 'proxy-authorization', 'te', 'trailer', 'upgrade', 'content-length', 'content-encoding', 'transfer-encoding', 'etag', 'digest', 'content-md5']) expect(folded.headers.has(name)).toBe(false);
+    expect(original.headers.get('x-private-hop')).toBe('upstream-only');
+    expect(await folded.json()).toEqual(failed ? { error: { message: 'local failure', code: 'local_error' } } : completed);
+  }
+});
+
+it('folds blank, trailing-comma and invalid connection tokens without throwing', async () => {
+  for (const connection of ['', 'keep-alive,', ' X-Private-Hop , invalid header ', ',,']) {
+    for (const failed of [false, true]) {
+      const payload = failed ? { type: 'response.failed', response: { error: { message: 'local failure' } } } : { type: 'response.completed', response: completed };
+      const folded = await foldResponsesStream(sse([{ data: payload }], { connection, 'x-private-hop': 'hop-only', 'x-request-id': 'trace' }));
+      expect(folded.status).toBe(failed ? 400 : 200);
+      expect(folded.headers.has('connection')).toBe(false);
+      expect(folded.headers.get('x-request-id')).toBe('trace');
+      expect(folded.headers.has('x-private-hop')).toBe(!connection.toLowerCase().includes('x-private-hop'));
+      expect(await folded.json()).toEqual(failed ? { error: { message: 'local failure' } } : completed);
+    }
+  }
+});
