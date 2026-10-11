@@ -41,8 +41,10 @@ export async function requestTokens(
     const code = response.status === 400 || response.status === 401 ? rejected : 'FLOW_FAILED';
     throw new OAuthError(code, `${vendor} token request failed (${await describeResponse(response)})`);
   }
-  const tokens = (await response.json()) as Partial<TokenResponse>;
-  if (typeof tokens.access_token !== 'string' || tokens.access_token === '') {
+  const tokens = (await response.json().catch((cause: unknown) => {
+    throw new OAuthError('FLOW_FAILED', `the ${vendor} token response is not JSON`, { cause });
+  })) as Partial<TokenResponse> | null;
+  if (tokens === null || typeof tokens !== 'object' || typeof tokens.access_token !== 'string' || tokens.access_token === '') {
     throw new OAuthError('FLOW_FAILED', `the ${vendor} token response is missing access_token`);
   }
   return tokens as TokenResponse;

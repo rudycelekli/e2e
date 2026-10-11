@@ -192,6 +192,8 @@ The id is not always the name the vendor's app shows.
 
 ## Sign-in help
 
+For browser sign-in and refresh, an unreadable form-token response fails with `FLOW_FAILED`; no credentials are saved.
+
 - ChatGPT opens a browser. To use a device code, add `--device`.
 - Copilot uses your GitHub CLI login. Without `gh`, pass `--client-id` with
   your own GitHub OAuth app that has device flow on. For GitHub Enterprise,
