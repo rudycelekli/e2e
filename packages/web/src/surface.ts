@@ -820,6 +820,25 @@ export class PlaywrightSurface {
     );
   }
 
+  /** Reads computed CSS from the exact single resolved target, including frames and closed roots. */
+  readComputedStyle(expression: LocatorExpression, property: string, operation: OperationContext): Promise<string | undefined> {
+    return this.guard(operation, 'computed style', async (currentOperation) => {
+      const nodes = await this.locate(expression, currentOperation);
+      if (nodes.length === 0) return undefined;
+      if (nodes.length !== 1) throw new TestError('LOCATOR_AMBIGUOUS', 'computed style requires exactly one node');
+      const session = this.requireSession();
+      const generation = session.token();
+      const target = session.refs.lookup(nodes[0]!.ref as NodeRef);
+      const read = (element: Element, name: string): string =>
+        element.ownerDocument.defaultView!.getComputedStyle(element).getPropertyValue(name);
+      const value = await (target.kind === 'element'
+        ? target.element.evaluate(read, property)
+        : target.locator.evaluate(read, property));
+      session.check(generation);
+      return value;
+    });
+  }
+
   /**
    * One action on a located or observed node. A `swipe` on the observation
    * root is the viewport swipe: a wheel gesture sized by the viewport, with no

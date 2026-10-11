@@ -21,6 +21,7 @@ import type { AttemptBudget } from './budget.ts';
 import { LocatorEngine } from '../locator/engine.ts';
 import {
   createLocator,
+  locatorInternals,
   createScopedScreen,
   createScreen,
   type ScreenContext,
@@ -337,6 +338,13 @@ function fixtureContext(
       steps.attachArtifact(environment.artifacts.register(kind, relativePath)),
     attachViewport: (viewport) => steps.attachViewport(viewport),
     locator: (expression) => createLocator(screenContext, expression),
+    locatorExpression: (target) => {
+      const internals = locatorInternals(target);
+      if (internals === undefined || internals.context !== screenContext) {
+        throw new TestError('INVALID_LOCATOR', 'locator must belong to this target and attempt');
+      }
+      return internals.expression;
+    },
     screen: (wrap) => createScopedScreen(screenContext, wrap),
     expectable<T extends object, E extends object>(target: T, factory: () => E): T & Expectable<E> {
       let surface: E | undefined;

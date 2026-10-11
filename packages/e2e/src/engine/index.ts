@@ -232,6 +232,8 @@ export interface EngineFixtureContext {
   attachViewport(viewport: { width: number; height: number; scale: number }): void;
   /** Mints a public locator from a raw expression (a platform selector, say). */
   locator(expression: LocatorExpression): Locator;
+  /** Reads a locator expression owned by this target and attempt. */
+  locatorExpression(target: Locator): LocatorExpression;
   /** Mints a screen scope whose every query is wrapped by `scope` (a nested document, say). */
   screen(scope: (expression: LocatorExpression) => LocatorExpression): Screen;
   /**

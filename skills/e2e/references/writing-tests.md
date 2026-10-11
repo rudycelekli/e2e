@@ -430,3 +430,7 @@ A `route`, `unroute`, or `waitForResponse` pattern is a glob string or
 - No sleeps or polling loops; a matcher with a longer `timeout` instead.
 - `await` every step call and `expect.poll`, else `STEP_NOT_AWAITED` at the line of the call.
 - Assert the fact a model produced with `toContain`, not its exact sentence.
+
+- `expect(browser).toHaveCSS(locator, property, expected, { timeout? })` polls
+  computed CSS on one element, including frame scopes and closed roots. Use CSS
+  property spelling; strings match exactly and RegExp matches the computed value.

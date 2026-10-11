@@ -270,6 +270,8 @@ export interface BrowserExpectation {
   /** Waits for the current title to match. */
   toHaveTitle(expected: TextMatch, options?: { timeout?: number }): Promise<void>;
   /** Waits for the target's `class` attribute to match: a string is the whole normalized class list, a RegExp is tested against it. */
+  /** Waits for a target's computed CSS property to match. Property names use CSS spelling. */
+  toHaveCSS(target: Locator, property: string, expected: TextMatch, options?: { timeout?: number }): Promise<void>;
   toHaveClass(target: Locator, expected: TextMatch, options?: { timeout?: number }): Promise<void>;
 }
 ```
@@ -291,6 +293,17 @@ attribute at all; Playwright's `toHaveClass('')` accepts both.
 await expect(browser).toHaveURL('/dashboard');
 await expect(browser).toHaveTitle(/Dashboard/);
 await expect(browser).toHaveClass(browser.locator('.card'), 'card active');
+```
+
+`expect(browser).toHaveCSS(locator, property, expected, { timeout? })` polls the
+computed style of one element. Use CSS names such as `background-color` or
+`--accent`; strings match the full computed value, and RegExp matches its text.
+Frame scopes and closed shadow roots follow the locator. A missing node keeps
+waiting for both positive and negative assertions; an ambiguous locator fails.
+The locator must belong to the current target and attempt.
+
+```ts
+await expect(browser).toHaveCSS(screen.getByRole('button', 'Save'), 'opacity', '1');
 ```
 
 ## Value matchers

@@ -160,6 +160,8 @@ export interface BrowserExpectation {
   toHaveURL(expected: string | RegExp, options?: { ignoreCase?: boolean; timeout?: number }): Promise<void>;
   /** Waits for the current title to match. */
   toHaveTitle(expected: TextMatch, options?: { timeout?: number }): Promise<void>;
+  /** Waits for a target's computed CSS property to match. Property names use CSS spelling. */
+  toHaveCSS(target: Locator, property: string, expected: TextMatch, options?: { timeout?: number }): Promise<void>;
   /** Waits for the target's `class` attribute to match: a string is the whole normalized class list, a RegExp is tested against it. */
   toHaveClass(target: Locator, expected: TextMatch, options?: { timeout?: number }): Promise<void>;
 }
@@ -317,7 +319,10 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
   /** The page title, read within the action timeout or, for a matcher poll, within the poll's deadline. */
   const currentTitle = (deadline?: Deadline) =>
     surface.guard(context.operation(deadline?.remaining()), 'title', () => surface.requirePage().title());
-  const expectation = createBrowserExpectation({ currentUrl, currentTitle, baseHref, deadlineFor, context });
+  const expectation = createBrowserExpectation({
+    currentUrl, currentTitle, baseHref, deadlineFor, context,
+    readCSS: (expression, property, deadline) => surface.readComputedStyle(expression, property, context.operation(deadline.remaining())),
+  });
 
   const browser: Omit<Browser, keyof Expectable<BrowserExpectation>> = {
     goto(url, options) {
@@ -630,6 +635,7 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
   const matchers: FixtureOperations<BrowserExpectation> = {
     toHaveURL: { kind: 'assertion', timeout: false, label: (expected) => String(expected) },
     toHaveTitle: { kind: 'assertion', timeout: false, label: (expected) => String(expected) },
+    toHaveCSS: { kind: 'assertion', timeout: false, label: (_target, property, expected) => `${property}: ${String(expected)}` },
     toHaveClass: { kind: 'assertion', timeout: false, label: (_target, expected) => String(expected) },
     get not() { return matchers; },
   };
@@ -659,6 +665,7 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
 interface ExpectationDeps {
   currentUrl(deadline: Deadline): Promise<string>;
   currentTitle(deadline: Deadline): Promise<string>;
+  readCSS(expression: LocatorExpression, property: string, deadline: Deadline): Promise<string | undefined>;
   baseHref(): string;
   deadlineFor(timeout: number | undefined): Deadline;
   readonly context: EngineFixtureContext;
@@ -735,6 +742,28 @@ function createBrowserExpectation(deps: ExpectationDeps, negated = false): Brows
         async (deadline) => {
           const title = await deps.currentTitle(deadline);
           return { matches: matchesText(title, pattern), observed: `title ${JSON.stringify(title)}` };
+        },
+        options?.timeout,
+      );
+    },
+    toHaveCSS(target, property, expected, options) {
+      validate('toHaveCSS', options);
+      if (typeof property !== 'string' || property.trim().length === 0) {
+        throw new TestError('INVALID_ARGUMENT', 'toHaveCSS property must be a nonempty CSS property name');
+      }
+      if (typeof deps.context.locatorExpression !== 'function') {
+        throw new ConfigurationError('UNSUPPORTED_CAPABILITY', 'toHaveCSS requires e2e >=0.20.0 with target-owned locator expressions');
+      }
+      const expression = deps.context.locatorExpression(target);
+      const pattern = toTextPattern(expected, { exact: true });
+      return poll(
+        'toHaveCSS',
+        `${property} ${describePattern(pattern)}`,
+        async (deadline) => {
+          const value = await deps.readCSS(expression, property, deadline);
+          return value === undefined
+            ? { matches: undefined, observed: 'no node' }
+            : { matches: matchesText(value, pattern), observed: `${property} ${JSON.stringify(value)}` };
         },
         options?.timeout,
       );
