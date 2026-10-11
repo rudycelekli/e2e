@@ -18,15 +18,15 @@ export interface SseEvent {
   readonly data: string;
 }
 
-/** Splits a text/event-stream body into events, tolerating either newline convention. */
+/** Splits a text/event-stream body into events, preserving field values and all three SSE line endings. */
 export function parseSse(text: string): SseEvent[] {
   const events: SseEvent[] = [];
-  for (const block of text.split(/\r?\n\r?\n/)) {
+  for (const block of text.replace(/\r\n|\r/g, '\n').split('\n\n')) {
     let event: string | undefined;
     const data: string[] = [];
-    for (const line of block.split(/\r?\n/)) {
-      if (line.startsWith('event:')) event = line.slice(6).trim();
-      else if (line.startsWith('data:')) data.push(line.slice(5).trimStart());
+    for (const line of block.split('\n')) {
+      if (line.startsWith('event:')) event = line.slice(6).replace(/^ /, '');
+      else if (line.startsWith('data:')) data.push(line.slice(5).replace(/^ /, ''));
     }
     if (data.length === 0) continue;
     events.push(event === undefined ? { data: data.join('\n') } : { event, data: data.join('\n') });

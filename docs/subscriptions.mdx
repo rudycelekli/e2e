@@ -45,6 +45,8 @@ import { chatgpt } from 'e2e/oauth/chatgpt';
 
 const agent = { model: chatgpt('gpt-6-luna') };
 ```
+
+ChatGPT responses accept LF, CRLF, or CR stream lines. Stream data keeps its leading whitespace.
   </Tab>
   <Tab title="GitHub Copilot">
 <CodeGroup>

@@ -78,3 +78,15 @@ describe('foldResponsesStream', () => {
     expect(parseSse('event: a\r\ndata: 1\r\ndata: 2\r\n\r\ndata: {"b":1}\r\n\r\n')).toEqual([{ event: 'a', data: '1\n2' }, { data: '{"b":1}' }]);
   });
 });
+
+describe('SSE line and field conventions', () => {
+  it.each(['\n', '\r\n', '\r'])('folds completed responses with %j line endings', async (line) => {
+    const payload = { type: 'response.completed', response: completed };
+    const body = `: keepalive${line}${line}event: response.completed${line}data: ${JSON.stringify(payload)}${line}${line}`;
+    const folded = await foldResponsesStream(new Response(body, { headers: { 'content-type': 'text/event-stream' } }));
+    expect(await folded.json()).toEqual(completed);
+  });
+  it('removes only the optional single ASCII space from a field value', () => {
+    expect(parseSse('event:  named \ndata:  indented\ndata:\tkept\n\n')).toEqual([{ event: ' named ', data: ' indented\n\tkept' }]);
+  });
+});
