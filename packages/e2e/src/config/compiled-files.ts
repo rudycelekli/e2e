@@ -41,7 +41,7 @@ const INSTALLED = /\/node_modules\//;
 
 /** Whether the `file:` URL `url` is the project's own, outside `node_modules`. */
 export function isProjectFile(url: URL): boolean {
-  return url.protocol === 'file:' && !INSTALLED.test(url.pathname);
+  return url.protocol === 'file:' && !INSTALLED.test(fileURLToPath(url).split(path.sep).join('/'));
 }
 
 /** A file the loader compiles. */

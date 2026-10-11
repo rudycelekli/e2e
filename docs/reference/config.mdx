@@ -89,6 +89,8 @@ a `#` import or package export that names a missing `./x.js`, `./x.jsx`, or
 it). An import written in a JavaScript file resolves
 as Node.js resolves it. Percent-encoded file URL imports follow the same
 source rules: `./view%2Etsx` loads `view.tsx` with the project's JSX settings.
+An installed file remains on package defaults when `node_modules` is
+percent-encoded in the URL.
 
 The `tsconfig.json` is the nearest one above the file, or, when that one has
 `references` and does not include the file itself (as Vite writes it), the

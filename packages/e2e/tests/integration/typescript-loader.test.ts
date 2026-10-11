@@ -215,6 +215,19 @@ describe('the TypeScript loader', () => {
     expect(code).toBe(0);
   });
 
+  it('keeps encoded installed JSX on package defaults in the built CLI', async () => {
+    createProject({ type: 'module' });
+    const installed = pathToFileURL(path.join(dir, 'node_modules', 'encoded', 'view.tsx')).href.replace('node_modules', 'n%6Fde_modules');
+    write({
+      'register-encoded.mjs': "import { registerHooks } from 'node:module';\nregisterHooks({ resolve(specifier, context, nextResolve) { const result = nextResolve(specifier, context); return result.url.includes('/node_modules/encoded/') ? { ...result, url: result.url.replace('/node_modules/', '/n%6Fde_modules/') } : result; } });\n",
+      'node_modules/encoded/view.tsx': "const React = { createElement: () => 'package-default' };\nconst h = () => 'project-override';\nexport const value = <b />;\n",
+      'tests/encoded.e2e.ts': `import { expect, test } from 'e2e';\nimport { value } from '${installed}';\ntest('installed JSX keeps defaults', () => { expect(value).toBe('package-default'); });\n`,
+    });
+    const { code, stdout } = await runCli(['tests/encoded.e2e.ts'], { NODE_OPTIONS: `--import ${pathToFileURL(path.join(dir, 'register-encoded.mjs')).href}` });
+    expect(stdout).toContain('1 passed');
+    expect(code).toBe(0);
+  });
+
   it('points a failure and its test at the TypeScript source', async () => {
     createProject({ type: 'module' });
     const { code, stdout } = await runCli(['tests/failing']);
