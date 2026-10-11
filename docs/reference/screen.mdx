@@ -124,17 +124,18 @@ Prefer it over `browser.locator('p:visible')`, which ties the test to CSS.
 Refinement returns a new locator without querying the app. `hasText` with a
 string is a case-insensitive substring match over the match and its
 descendants, unlike a query text, which matches exactly; pass a RegExp for
-anything stricter. `has` keeps a match whose subtree resolves the inner
-locator.
+anything stricter. `hasNotText` excludes matches with that subtree text,
+using the same substring or RegExp rules. `has` keeps a match whose subtree
+resolves the inner locator.
 
-Throws `INVALID_LOCATOR` when `filter` gets neither `hasText` nor `has`, when
-it gets any other key, even beside them (`hasNot`, `hasNotText`, and
+Throws `INVALID_LOCATOR` when `filter` gets none of `hasText`, `hasNotText`,
+or `has`, when it gets any other key, even beside them (`hasNot` and
 `visible` are not filters here), when `has` is not a runner locator or was
 made by another target's screen, or when `nth` gets a negative or
 non-integer index.
 
 ```ts
-const row = screen.getByRole('listitem').filter({ hasText: 'Invoice 42' });
+const row = screen.getByRole('listitem').filter({ hasText: 'Invoice 42', hasNotText: 'Paid' });
 await row.getByRole('button', 'Void').tap();
 ```
 
@@ -311,7 +312,7 @@ export interface Locator extends Screen {
    */
   waitFor(options?: { state?: 'attached' | 'detached' | 'visible' | 'hidden'; timeout?: number }): Promise<void>;
   /** Adds deterministic locator filters. */
-  filter(options: { hasText?: TextMatch; has?: Locator }): Locator;
+  filter(options: { hasText?: TextMatch; hasNotText?: TextMatch; has?: Locator }): Locator;
   /** Selects the first current match. */
   first(): Locator;
   /** Selects the last current match. */

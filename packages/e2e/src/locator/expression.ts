@@ -92,15 +92,16 @@ function scoped(
 /** Builds a filter expression; an empty filter object is an immediate error. */
 export function filterExpression(
   source: LocatorExpression,
-  options: { hasText?: TextMatch; has?: LocatorExpression },
+  options: { hasText?: TextMatch; hasNotText?: TextMatch; has?: LocatorExpression },
 ): LocatorExpression {
-  if (options.hasText === undefined && options.has === undefined) {
-    throw new TestError('INVALID_LOCATOR', 'filter() requires hasText and/or has');
+  if (options.hasText === undefined && options.hasNotText === undefined && options.has === undefined) {
+    throw new TestError('INVALID_LOCATOR', 'filter() requires hasText, hasNotText, and/or has');
   }
   return {
     kind: 'filter',
     source,
     ...(options.hasText !== undefined ? { hasText: toTextPattern(options.hasText, { exact: false }) } : {}),
+    ...(options.hasNotText !== undefined ? { hasNotText: toTextPattern(options.hasNotText, { exact: false }) } : {}),
     ...(options.has !== undefined ? { has: options.has } : {}),
   };
 }
@@ -168,6 +169,11 @@ export function describeExpression(expression: LocatorExpression): string {
       if (expression.hasText !== undefined) {
         parts.push(
           `hasText: ${expression.hasText.kind === 'string' ? JSON.stringify(expression.hasText.value) : `/${expression.hasText.source}/${expression.hasText.flags}`}`,
+        );
+      }
+      if (expression.hasNotText !== undefined) {
+        parts.push(
+          `hasNotText: ${expression.hasNotText.kind === 'string' ? JSON.stringify(expression.hasNotText.value) : `/${expression.hasNotText.source}/${expression.hasNotText.flags}`}`,
         );
       }
       if (expression.has !== undefined) parts.push(`has: ${describeExpression(expression.has)}`);

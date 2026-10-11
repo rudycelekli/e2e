@@ -1,6 +1,6 @@
 /**
- * `locator.filter(options)` takes `hasText` and `has` and nothing else. A key
- * it does not implement (`hasNot`, `hasNotText`, `visible`) must fail the
+ * `locator.filter(options)` takes `hasText`, `hasNotText` and `has`. A key
+ * it does not implement (`hasNot`, `visible`) must fail the
  * call, alone or beside a supported one, rather than be dropped: dropping an
  * exclusion widens the match and the action lands on the wrong row.
  */
@@ -41,15 +41,13 @@ describe('locator.filter options', () => {
   });
 
   it.each<[string, (paid: Locator) => object, string]>([
-    ['hasNotText beside hasText', () => ({ hasText: 'Invoice', hasNotText: 'Paid' }), 'key "hasNotText"'],
     ['hasNot beside has', (paid) => ({ has: paid, hasNot: paid }), 'key "hasNot"'],
     ['visible beside hasText', () => ({ hasText: 'Invoice', visible: true }), 'key "visible"'],
-    ['hasNotText alone', () => ({ hasNotText: 'Paid' }), 'key "hasNotText"'],
-    ['two unknown keys', (paid) => ({ hasText: 'Invoice', hasNot: paid, hasNotText: 'Paid' }), 'keys "hasNot", "hasNotText"'],
+    ['two unknown keys', (paid) => ({ hasText: 'Invoice', hasNot: paid, visible: true }), 'keys "hasNot", "visible"'],
     [
-      'a non-enumerable hasNotText',
-      () => Object.defineProperty({ hasText: 'Invoice' }, 'hasNotText', { value: 'Paid' }),
-      'key "hasNotText"',
+      'a non-enumerable hasNot',
+      () => Object.defineProperty({ hasText: 'Invoice' }, 'hasNot', { value: 'Paid' }),
+      'key "hasNot"',
     ],
   ])('rejects %s with INVALID_LOCATOR before any engine call', (_, options, named) => {
     const { screen, expressions } = invoiceScreen();
@@ -57,7 +55,7 @@ describe('locator.filter options', () => {
     expect(() => screen.getByRole('row').filter(invalid<FilterOptions>(options(paid)))).toThrow(
       expect.objectContaining({
         code: 'INVALID_LOCATOR',
-        message: `filter options has no ${named}; it takes hasText, has`,
+        message: `filter options has no ${named}; it takes hasText, hasNotText, has`,
       }),
     );
     expect(expressions).toEqual([]);
@@ -76,7 +74,7 @@ describe('locator.filter options', () => {
   it('rejects absent options as an empty filter', () => {
     const { screen } = invoiceScreen();
     expect(() => screen.getByRole('row').filter(invalid<FilterOptions>(undefined))).toThrow(
-      expect.objectContaining({ code: 'INVALID_LOCATOR', message: 'filter() requires hasText and/or has' }),
+      expect.objectContaining({ code: 'INVALID_LOCATOR', message: 'filter() requires hasText, hasNotText, and/or has' }),
     );
   });
 });
@@ -91,4 +89,13 @@ describe('query options', () => {
     expect(() => query(screen)).toThrow(expect.objectContaining({ code: 'INVALID_LOCATOR', message }));
     expect(expressions).toEqual([]);
   });
+});
+
+it('excludes matching subtree text alone, composed with inclusion, and as a RegExp', async () => {
+  const { screen } = invoiceScreen();
+  expect(await screen.getByRole('row').filter({ hasNotText: 'paid' }).allTextContents()).toEqual(['Invoice 42 Due']);
+  expect(await screen.getByRole('row').filter({ hasText: 'invoice', hasNotText: /paid$/i }).allTextContents()).toEqual(['Invoice 42 Due']);
+  expect(await screen.getByRole('row').filter({ hasNotText: /Invoice/ }).count()).toBe(0);
+  expect(await screen.getByRole('row').filter({ hasNotText: 'unrelated' }).count()).toBe(2);
+  expect(await screen.getByRole('row').filter({ hasNotText: '' }).count()).toBe(0);
 });

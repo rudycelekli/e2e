@@ -109,3 +109,29 @@ describe('locator expressions over a device snapshot', () => {
     );
   });
 });
+
+it('excludes device subtree text with string and RegExp filters', () => {
+  expect(names({ kind: 'filter', source: query('role', 'listitem'), hasNotText: { kind: 'string', value: 'abo', exact: false } })).toEqual(['Scroller']);
+  expect(names({ kind: 'filter', source: query('role', 'listitem'), hasNotText: { kind: 'regexp', source: '^About$', flags: 'i' } })).toEqual(['Scroller']);
+  expect(names({ kind: 'filter', source: query('role', 'listitem'), hasText: exact('About'), hasNotText: exact('About') })).toEqual([]);
+});
+
+it('hasNotText excludes an unnamed container by its descendant text', () => {
+  let counter = 0;
+  const { index } = projectSnapshot([
+    { ref: '@e1', index: 0, depth: 0, type: 'Application', label: 'Fixture' },
+    { ref: '@e2', index: 1, parentIndex: 0, depth: 1, type: 'Cell', label: '', identifier: 'child-match' },
+    { ref: '@e3', index: 2, parentIndex: 1, depth: 2, type: 'StaticText', label: 'About' },
+    { ref: '@e4', index: 3, parentIndex: 0, depth: 1, type: 'Cell', label: '', identifier: 'child-other' },
+    { ref: '@e5', index: 4, parentIndex: 3, depth: 2, type: 'StaticText', label: 'Other' },
+    { ref: '@e6', index: 5, parentIndex: 0, depth: 1, type: 'Cell', label: '', identifier: 'empty' },
+  ], { mintId: () => `n${++counter}` });
+  const source = query('role', 'listitem');
+  const candidates = resolveExpression(source, index);
+  expect(candidates.map(entry => entry.node.name ?? '')).toEqual(['', '', '']);
+  const ids = (pattern: TextPattern): (string | undefined)[] =>
+    resolveExpression({ kind: 'filter', source, hasNotText: pattern }, index).map(entry => entry.node.testId);
+  expect(ids(exact('About'))).toEqual(['child-other', 'empty']);
+  expect(ids({ kind: 'regexp', source: '^about$', flags: 'i' })).toEqual(['child-other', 'empty']);
+  expect(ids(exact('Missing'))).toEqual(['child-match', 'child-other', 'empty']);
+});

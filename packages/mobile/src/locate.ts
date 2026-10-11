@@ -22,6 +22,7 @@ export function resolveExpression(expression: LocatorExpression, index: readonly
       const source = resolveExpression(expression.source, index);
       return source.filter((entry) => {
         if (expression.hasText !== undefined && !subtreeHasText(entry, index, expression.hasText)) return false;
+        if (expression.hasNotText !== undefined && subtreeHasText(entry, index, expression.hasNotText)) return false;
         if (expression.has !== undefined) {
           const within = descendantsOf([entry], index);
           if (resolveExpression(expression.has, within).length === 0) return false;

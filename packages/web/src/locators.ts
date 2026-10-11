@@ -299,6 +299,7 @@ function project(scope: PwScope, expression: LocatorExpression, testIdAttribute:
       const source = project(scope, expression.source, testIdAttribute);
       const options: PwFilterOptions = {};
       if (expression.hasText !== undefined) options.hasText = patternToPw(expression.hasText);
+      if (expression.hasNotText !== undefined) options.hasNotText = patternToPw(expression.hasNotText);
       if (expression.has !== undefined) {
         options.has = requireComposable(project(scope, expression.has, testIdAttribute));
       }

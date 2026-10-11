@@ -102,6 +102,15 @@ describe('locators inside closed shadow roots', () => {
     rmSync(artifactsDir, { recursive: true, force: true });
   });
 
+  it('excludes button text with string and RegExp filters across roots', async () => {
+    const buttons = byRole('button');
+    const retained = await locate({ kind: 'filter', source: buttons, hasNotText: loose('twin') });
+    expect(retained.map(node => node.name)).toEqual(['Submit', 'Open inside closed', 'Closed inside open', 'Sidecar']);
+    const regex = await locate({ kind: 'filter', source: buttons, hasNotText: { kind: 'regexp', source: '^Twin$', flags: 'i' } });
+    expect(regex.map(node => node.name)).toEqual(retained.map(node => node.name));
+    expect(await locate({ kind: 'filter', source: buttons, hasText: loose('Twin'), hasNotText: loose('Twin') })).toEqual([]);
+  });
+
   it('resolves every query kind to the node the observed tree names', async () => {
     const observed = [...walk((await engine.observe!(op)).root)];
     const observedSubmit = observed.find((node) => node.role === 'button' && node.name === 'Submit');
