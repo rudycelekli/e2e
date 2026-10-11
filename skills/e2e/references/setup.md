@@ -7,7 +7,8 @@
   `.ts` source load as ESM regardless of the nearest `package.json` `type`
   (CommonJS packages need no change); never `require` or `module.exports`.
   Imports follow TypeScript: `./x.js` or `./x` loads `x.ts`, and the nearest
-  `tsconfig.json` `paths` and `baseUrl` apply. Decorators need
+  `tsconfig.json` `paths` and `baseUrl` apply. Cyclic directory `main` entries,
+  including symlink aliases, fall back to an index or remain unresolved. Decorators need
   `experimentalDecorators`; CommonJS TypeScript goes in `.cts`.
 - Browser tests: `@e2e-dev/web`, pinning `playwright-core` exactly; do not
   add `playwright` for it. Missing browsers download on first boot; in CI run

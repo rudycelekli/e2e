@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -15,7 +15,7 @@ function fixture() {
   return root;
 }
 function resolveA(root: string) {
-  return resolve('./a', { parentURL: pathToFileURL(path.join(root, 'test.ts')).href, conditions: ['node', 'import'], importAttributes: {} }, (request) => ({url: request}));
+  return resolve('./a', { parentURL: pathToFileURL(path.join(root, 'test.ts')).href, conditions: ['node', 'import'], importAttributes: {} }, (request) => { if (request === './a') throw Object.assign(new Error('Cannot find module ./a'), { code: 'ERR_MODULE_NOT_FOUND' }); return {url: request}; });
 }
 describe('directory main resolution', () => {
   it('falls back to the index when two package main entries cycle', () => {
@@ -24,7 +24,20 @@ describe('directory main resolution', () => {
     expect(resolveA(root).url).toBe(pathToFileURL(path.join(root, 'a/index.ts')).href);
   });
   it('ends an unresolved cycle without overflowing the resolver', () => {
-    expect(resolveA(fixture()).url).toBe('./a');
+    expect(() => resolveA(fixture())).toThrowError(expect.objectContaining({code:'ERR_MODULE_NOT_FOUND'}));
+  });
+  it('falls back when a symlinked main returns to the same physical directory', () => {
+    const root = fixture();
+    writeFileSync(path.join(root, 'a/package.json'), JSON.stringify({main:'./again'}));
+    symlinkSync(path.join(root, 'a'), path.join(root, 'a/again'), 'junction');
+    writeFileSync(path.join(root, 'a/index.ts'), 'export const value = 1;');
+    expect(resolveA(root).url).toBe(pathToFileURL(path.join(root, 'a/index.ts')).href);
+  });
+  it('propagates the unresolved error for a symlinked main with no index', () => {
+    const root = fixture();
+    writeFileSync(path.join(root, 'a/package.json'), JSON.stringify({main:'./again'}));
+    symlinkSync(path.join(root, 'a'), path.join(root, 'a/again'), 'junction');
+    expect(() => resolveA(root)).toThrowError(expect.objectContaining({code:'ERR_MODULE_NOT_FOUND'}));
   });
   it('keeps a valid main redirect ahead of its own index', () => {
     const root = fixture();

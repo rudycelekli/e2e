@@ -338,6 +338,19 @@ describe('the TypeScript loader', () => {
 });
 
 describe('cyclic directory main through the built loader', () => {
+  it('the built CLI resolves a symlinked main through its physical directory index', async () => {
+    createProject({ type: 'module' });
+    write({
+      'lib/cyclic/package.json': JSON.stringify({main:'./again'}),
+      'lib/cyclic/index.ts': "export const value = 'physical index';\n",
+      'tests/cycle.e2e.ts': "import { test, expect } from 'e2e';\nimport { value } from '../lib/cyclic';\ntest('physical index fallback', () => { expect(value).toBe('physical index'); });\n",
+    });
+    symlinkSync(path.join(dir, 'lib/cyclic'), path.join(dir, 'lib/cyclic/again'), 'junction');
+    const { code, stdout } = await runCli(['tests/cycle.e2e.ts']);
+    expect(stdout).toContain('1 passed');
+    expect(code).toBe(0);
+  });
+
   it('imports the directory index when package main points back to the same directory', async () => {
     createProject({ type: 'module' });
     write({

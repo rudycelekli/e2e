@@ -36,7 +36,7 @@
  * properties.
  */
 
-import { readFileSync } from 'node:fs';
+import { readFileSync, realpathSync } from 'node:fs';
 import nodeModule, { type LoadHookSync, type ResolveHookContext, type ResolveHookSync } from 'node:module';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -117,13 +117,16 @@ function directoryMain(directory: string, view: ProjectView): string | undefined
  * package.json `main` names, else its index.
  */
 function typeScriptFile(target: string, view: ProjectView, seen: Set<string> = new Set()): string | undefined {
-  if (seen.has(target)) return undefined;
-  seen.add(target);
   if (writtenCandidates(path.extname(target)).length > 0) return swappedFile(target, view);
   if (view.isFile(target)) return target;
   const implied = firstFile(IMPLIED_EXTENSIONS.map((extension) => `${target}${extension}`), view);
   if (implied !== undefined) return implied;
   const main = directoryMain(target, view);
+  if (main !== undefined) {
+    const directory = realpathSync(target);
+    if (seen.has(directory)) return undefined;
+    seen.add(directory);
+  }
   const fromMain = main === undefined || main === target ? undefined : typeScriptFile(main, view, seen);
   return fromMain ?? firstFile(IMPLIED_EXTENSIONS.map((extension) => `${path.join(target, 'index')}${extension}`), view);
 }
