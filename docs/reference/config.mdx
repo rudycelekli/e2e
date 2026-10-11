@@ -91,7 +91,7 @@ as Node.js resolves it.
 
 The `tsconfig.json` is the nearest one above the file, or, when that one has
 `references` and does not include the file itself (as Vite writes it), the
-directly referenced one that does. e2e reads its `paths`, `baseUrl`, `jsx`, `jsxFactory`,
+transitively referenced one that does. References are visited in declaration order; cycles are skipped and, if none owns the file, the nearest config remains the fallback. e2e reads its `paths`, `baseUrl`, `jsx`, `jsxFactory`,
 `jsxFragmentFactory`, `jsxImportSource`, `experimentalDecorators`,
 `emitDecoratorMetadata`, `useDefineForClassFields` (and `target`, which sets
 its default), and `verbatimModuleSyntax`, once per process and again for each
