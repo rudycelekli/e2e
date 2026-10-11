@@ -623,6 +623,10 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
       const operation = context.operation(options.timeout);
       let triggerFailure: { cause: unknown } | undefined;
       return surface.guard(operation, 'downloads', async (currentOperation) => {
+        const deadline = new Deadline(currentOperation.timeoutMs);
+        const saving = new AbortController();
+        const signal = AbortSignal.any([currentOperation.signal, saving.signal]);
+        let finished = false;
         const page = surface.requirePage();
         const remote = surface.remoteDownloads();
         if (remote !== undefined) await saveDownloadsTo(page, remote.dir);
@@ -637,7 +641,7 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
         page.on('download', onDownload);
         const removeListener = (): void => { page.off('download', onDownload); };
         const waiter = raceAbort(
-          withTimeout(received, currentOperation.timeoutMs, () =>
+          withTimeout(received, deadline.remaining(), () =>
             new TestError('ACTION_FAILED', `waitForDownloads: ${collected.length} of ${count} downloads started within ${currentOperation.timeoutMs}ms`)),
           currentOperation.signal,
           'waitForDownloads',
@@ -648,17 +652,32 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
           try { await trigger(); }
           catch (cause) { triggerFailure = { cause }; throw cause; }
           const downloads = await waiter;
-          const files: { path: string; absolutePath: string; suggestedFilename: string }[] = [];
-          for (const download of downloads) {
-            const suggestedFilename = download.suggestedFilename();
-            const { relative, absolute } = surface.artifactPath('downloads', suggestedFilename, '');
-            if (remote === undefined) await saveLocally(download, absolute, surface.unservedDownloads());
-            else await saveFromBrowser(download, remote, absolute, currentOperation.signal);
-            context.attachArtifact('download', relative);
-            files.push({ path: relative, absolutePath: absolute, suggestedFilename });
-          }
+          const timeout = (): TestError => new TestError('ACTION_FAILED',
+            `waitForDownloads: ${count} downloads did not finish within ${currentOperation.timeoutMs}ms`);
+          if (deadline.remaining() <= 0) throw timeout();
+          const save = async () => {
+            const files: { path: string; absolutePath: string; suggestedFilename: string }[] = [];
+            for (const download of downloads) {
+              const suggestedFilename = download.suggestedFilename();
+              const { relative, absolute } = surface.artifactPath('downloads', suggestedFilename, '');
+              if (remote === undefined) await saveLocally(download, absolute, surface.unservedDownloads());
+              else await saveFromBrowser(download, remote, absolute, signal);
+              if (signal.aborted) throw timeout();
+              context.attachArtifact('download', relative);
+              files.push({ path: relative, absolutePath: absolute, suggestedFilename });
+            }
+            return files;
+          };
+          const files = await raceAbort(withTimeout(save(), deadline.remaining(), timeout), signal, 'waitForDownloads');
+          finished = true;
           return files;
-        } finally { removeListener(); complete(collected); }
+        } finally {
+          removeListener(); complete(collected);
+          if (!finished) {
+            saving.abort();
+            for (const download of collected) void download.cancel().catch(() => undefined);
+          }
+        }
       }, (cause, label) => {
         if (triggerFailure !== undefined && Object.is(cause, triggerFailure.cause)) throw cause;
         return translatePwError(cause, label);

@@ -410,8 +410,10 @@ the app opens itself (`target="_blank"`, `window.open`) is not followed:
 - `waitForDownload(() => trigger, { timeout? })`: returns
   `{ path, suggestedFilename }`.
 - `waitForDownloads(() => trigger, { count, timeout? })`: calls the trigger once
-  and returns that many `{ path, suggestedFilename }` results in download-start order.
+  and returns that many `{ path, absolutePath, suggestedFilename }` results in download-start order.
+  `path` is artifact-relative; `absolutePath` is the readable local file.
   Each file is attached separately; an incomplete batch reports its count at timeout.
+  The original timeout also bounds completion and saving after the files start.
 - `keyboard.press(key)`, `keyboard.type(text)`, `mouse.*`: unfocused input;
   prefer `locator.press` and `locator.fill`.
 

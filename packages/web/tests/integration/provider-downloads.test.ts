@@ -13,7 +13,9 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeAll, afterAll, describe, expect, it } from 'vitest';
 import type { EngineFixtureContext, EngineHandle, OperationContext } from 'e2e/engine';
-import { web as webEngine, surfaceOf, type BrowserProvider, type BrowserProviderScope, type Browser } from '../../src/index.ts';
+import type { BrowserProvider, BrowserProviderScope, Browser } from '../../src/index.ts';
+const builtWeb = '../../dist/index.js';
+const { web: webEngine, surfaceOf } = await import(builtWeb) as typeof import('../../src/index.ts');
 import { closeRemoteChrome, launchRemoteChrome, type RemoteChrome } from '../helpers/cdp-host.ts';
 import { startFixtureApp, type FixtureApp } from '../helpers/fixture-app.ts';
 import { ignoreTrace, noSecrets } from '../helpers/secrets.ts';
@@ -126,4 +128,57 @@ describe.each<BrowserProviderScope>(['worker', 'attempt'])('downloads through a 
     expect(reads.every(read => path.dirname(read.file) === path.join(remoteDisk!, 'downloads'))).toBe(true);
     expect(readdirSync(path.join(remoteDisk, 'downloads')).toSorted()).toEqual(reads.map(read => path.basename(read.file)).toSorted());
   });
+
+  it('bounds an actual completed download whose provider read is stalled', async () => {
+    artifactsDir = mkdtempSync(path.join(tmpdir(), 'e2e-provider-stalled-'));
+    remoteDisk = mkdtempSync(path.join(tmpdir(), 'e2e-browser-stalled-'));
+    chrome = await launchRemoteChrome();
+    let readSignal: AbortSignal | undefined;
+    const provider: BrowserProvider = {
+      name: 'stalled-remote', scope,
+      acquire: async () => ({ id: 'stalled-lease', cdpEndpoint: chrome!.endpoint }),
+      release: async () => undefined,
+      downloads: {
+        dir: path.join(remoteDisk, 'downloads'),
+        async read(_lease, file, { signal }) {
+          expect((await readFile(file)).toString()).toBe('stalled provider body');
+          readSignal = signal;
+          return new Promise<Uint8Array>((_resolve, reject) => {
+            if (signal.aborted) reject(new Error('provider read canceled'));
+            else signal.addEventListener('abort', () => reject(new Error('provider read canceled')), { once: true });
+          });
+        },
+      },
+    };
+    engine = webEngine({ browser: provider });
+    const prepared = await engine.prepare!({ runId: 'run-downloads', targetName: 'web', projectRoot: process.cwd(), app: { site: new URL(app.url).hostname }, slots: 1, env: {}, signal: signal(), headed: false, log: () => undefined });
+    await engine.init!({ runId: 'run-downloads', targetName: 'web', projectRoot: process.cwd(), app: { site: new URL(app.url).hostname }, env: { ...prepared?.env }, headed: false, workerSlot: 0, signal: signal(), log: () => undefined });
+    await engine.startAttempt!({ attemptId: 'a1', artifactsDir, signal: signal(), resolveSecret: noSecrets, ...ignoreTrace });
+    await engine.session!.open!(app.url, operation());
+    const page = surfaceOf(engine)!.page();
+    await page.evaluate(() => {
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(new Blob(['stalled provider body']));
+      link.download = 'report.txt';link.id = 'download';document.body.append(link);
+    });
+    const attached: string[] = [];
+    const browser = engine.fixtures!['browser']!({
+      operation: (timeout?: number) => ({ ...operation(), timeoutMs: timeout ?? 15000 }),
+      app: { resolveUrl: (url: string) => new URL(url, app.url).href },
+      expectable: (target: object) => target, fixture: (_name: string, target: object) => target,
+      attachArtifact: (_kind: string, relative: string) => attached.push(relative),
+    } as unknown as EngineFixtureContext) as Browser;
+    const work = browser.waitForDownloads(() => page.locator('#download').click(), { count: 1, timeout: 500 });
+    let watchdog: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const result = await Promise.race([
+        work.then(() => ({ code: 'completed', message: '' }), (error: { code: string; message: string }) => error),
+        new Promise<{ code: string; message: string }>((resolve) => { watchdog = setTimeout(() => resolve({ code: 'still pending', message: '' }), 1500); }),
+      ]);
+      expect(result).toMatchObject({ code: 'ACTION_FAILED', message: expect.stringContaining('did not finish') });
+      expect(readSignal?.aborted).toBe(true);
+      expect(attached).toEqual([]);
+    } finally { clearTimeout(watchdog); }
+  });
+
 });

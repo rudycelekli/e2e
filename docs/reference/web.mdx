@@ -660,7 +660,9 @@ and saves each as a separate artifact. Results follow download-start order. Each
 and `suggestedFilename`; `absolutePath` names the completed runner-side file
 for reading or uploading, including after a hosted provider transfers it.
 When fewer files start before the timeout, the error reports the received
-and requested counts. Extra downloads are outside this wait.
+and requested counts. The original timeout also bounds file completion and
+saving, including hosted provider reads; unfinished downloads are canceled and
+late results are not attached as artifacts. Extra downloads are outside this wait.
 
 ```ts
 const exports = await browser.waitForDownloads(

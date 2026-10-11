@@ -15,10 +15,12 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import type { EventEmitter } from 'node:events';
-import type { Page } from 'playwright-core';
+import type { Download, Page } from 'playwright-core';
 import { TestError, type EngineFixtureContext } from 'e2e/engine';
 import { PlaywrightSurface } from '../../src/surface.ts';
-import { createBrowserFixture, type Browser, type WebRoute } from '../../src/browser.ts';
+import type { Browser, WebRoute } from '../../src/browser.ts';
+const browserModule = '../../dist/browser.js';
+const { createBrowserFixture } = await import(browserModule) as typeof import('../../src/browser.ts');
 import { ignoreTrace, noSecrets } from '../helpers/secrets.ts';
 
 interface Echo {
@@ -36,6 +38,15 @@ function startCountingServer(hits: Map<string, number>): Promise<{ server: Serve
   const server = createServer((request, response) => {
     const pathname = new URL(request.url ?? '/', 'http://host').pathname;
     hits.set(pathname, (hits.get(pathname) ?? 0) + 1);
+    if (pathname === '/stream-download') {
+      response.writeHead(200, {
+        'content-type': 'application/octet-stream',
+        'content-disposition': 'attachment; filename="stream.bin"',
+        'content-length': '1024',
+      });
+      response.write('partial');
+      return;
+    }
     if (pathname === '/echo') {
       let body = '';
       request.on('data', (chunk: Buffer) => { body += chunk.toString(); });
@@ -148,6 +159,24 @@ describe('browser.route decisions', () => {
       code: 'ACTION_FAILED', message: expect.stringContaining('0 of 2 downloads'),
     });
     expect((page as unknown as EventEmitter).listenerCount('download')).toBe(listeners);
+  });
+
+  it('bounds saving a real download whose HTTP body never finishes', async () => {
+    await page.evaluate(() => { const link=document.createElement('a');link.href='/stream-download';link.textContent='Stream';document.body.append(link); });
+    const baseline = (page as unknown as EventEmitter).listenerCount('download');
+    let download: Download | undefined;
+    page.once('download', value => { download=value; });
+    const work = browser.waitForDownloads(() => page.getByRole('link', {name:'Stream'}).click(), {count:1, timeout:500});
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const result = await Promise.race([work.then(() => 'completed', cause => cause), new Promise(resolve => { timer=setTimeout(() => resolve('still pending'), 1500); })]);
+      expect(result).toMatchObject({code:'ACTION_FAILED',message:expect.stringContaining('did not finish')});
+      expect((page as unknown as EventEmitter).listenerCount('download')).toBe(baseline);
+    } finally {
+      if(timer!==undefined) clearTimeout(timer);
+      await download?.cancel();
+      await work.catch(() => undefined);
+    }
   });
 
   it('keeps a trigger error and removes the multi-download listener immediately', async () => {
