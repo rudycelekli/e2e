@@ -58,7 +58,7 @@ it('keeps an actual offline change while its context opens a replacement tab',as
  const setOffline=context.setOffline.bind(context);
  const spy=vi.spyOn(context,'setOffline').mockImplementation(async offline=>{await setOffline(offline);applied();await held;});
  changing=fixture(engine,app.url).setOffline(true);
- await appliedState;
+ await Promise.race([appliedState, changing]);
  await engine.session!.open!('about:blank',op());expect(surface.context()).toBe(context);
  release();await changing;spy.mockRestore();
  expect(await surface.page().evaluate(()=>navigator.onLine)).toBe(false);
