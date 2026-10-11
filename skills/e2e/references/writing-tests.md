@@ -387,7 +387,9 @@ the app opens itself (`target="_blank"`, `window.open`) is not followed:
   `EVALUATE_FAILED`.
 - `addInitScript(source | { path } | fn)`, `addInitScript(fn, arg)`: runs
   before the page's own scripts; call it before `app.open`. `arg` is JSON.
-- `route(pattern, handler)`, `unroute(pattern)`: intercept requests, newest
+- `route(pattern, handler)`, `unroute(pattern)`, `unrouteAll()`: intercept
+  requests or remove every browser route while preserving configured site
+  headers, newest
   route first; `route.request` has `url`, `method`, `headers`, `postData`.
   The handler calls exactly one of
   `fulfill({ status?, headers?, contentType?, json | body | path })`,

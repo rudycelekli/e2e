@@ -1,5 +1,5 @@
 /** Compile-time assertions for route decisions: the options each one takes, and the ones it refuses at runtime too. */
-import type { RouteContinueOverrides, RouteFulfillResponse, WebRoute } from '../../src/index.ts';
+import type { Browser, RouteContinueOverrides, RouteFulfillResponse, WebRoute } from '../../src/index.ts';
 
 ({ json: { ok: true }, contentType: 'application/vnd.quote+json' }) satisfies RouteFulfillResponse;
 ({ path: 'fixtures/quote.json', status: 201 }) satisfies RouteFulfillResponse;
@@ -14,6 +14,11 @@ import type { RouteContinueOverrides, RouteFulfillResponse, WebRoute } from '../
 ({ response: {} }) satisfies RouteFulfillResponse;
 // @ts-expect-error header values are strings.
 ({ headers: { 'x-n': 1 } }) satisfies RouteContinueOverrides;
+
+declare const browser: Browser;
+void (browser.unrouteAll() satisfies Promise<void>);
+// @ts-expect-error clearing routes takes no options
+void browser.unrouteAll({ behavior: 'ignoreErrors' });
 
 declare const route: WebRoute;
 void route.continue();

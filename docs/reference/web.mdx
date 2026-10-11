@@ -248,7 +248,7 @@ a page acts on that tab: `goto`, `reload`, `back`, `forward`, `url`, `title`,
 `waitForURL`, `locator`, `frameLocator`, `evaluate`, `waitForResponse`,
 `waitForDownload`, `keyboard`, `mouse`, the `expect(browser)` matchers, and
 every `screen` query. What belongs to the browser covers every tab:
-`cookies`, `setCookies`, `route`, `unroute`, `onDialog`, and `addInitScript`. `setViewport`
+`cookies`, `setCookies`, `route`, `unroute`, `unrouteAll`, `onDialog`, and `addInitScript`. `setViewport`
 sizes the active tab and every tab opened after it.
 
 A tab the app opens itself, from a `target="_blank"` link or `window.open`,
@@ -310,6 +310,7 @@ export interface Browser extends Expectable<BrowserExpectation> {
   ): Promise<void>;
   /** Removes matching attempt-scoped routes. */
   unroute(pattern: string | RegExp): Promise<void>;
+  unrouteAll(): Promise<void>;
   /** Waits for a matching response. */
   waitForResponse(
     pattern: string | RegExp,
@@ -358,7 +359,7 @@ export interface Browser extends Expectable<BrowserExpectation> {
 | `goto`, `reload`, `back`, `forward` | `config.timeout`, 120000 ms, the same budget `app.open()` uses; `{ timeout }` overrides, capped by the test deadline |
 | `waitForResponse`, `waitForDownload` | `config.actionTimeout`, 30000 ms; `{ timeout }` overrides, capped by the test deadline |
 | `waitForURL` | `config.assertionTimeout`, 5000 ms |
-| `url`, `title`, `evaluate`, `addInitScript`, `route`, `unroute`, `cookies`, `setCookies`, `setViewport`, `onDialog`, `keyboard.*`, `mouse.*` | `config.actionTimeout`, 30000 ms, not overridable |
+| `url`, `title`, `evaluate`, `addInitScript`, `route`, `unroute`, `unrouteAll`, `cookies`, `setCookies`, `setViewport`, `onDialog`, `keyboard.*`, `mouse.*` | `config.actionTimeout`, 30000 ms, not overridable |
 
 Every `browser` call is a recorded `browser.<method>` step, except `locator` and
 `frameLocator`: they build a locator without touching the page, and the
@@ -467,7 +468,10 @@ A script added after the page opened runs from the next navigation or reload.
 
 `route`, `unroute`, and `waitForResponse` take a string pattern (`*` within a
 path segment, `**` across `/`) or a `RegExp`, both tested against the full
-URL; a predicate function is `INVALID_ARGUMENT`. A route survives
+URL; a predicate function is `INVALID_ARGUMENT`. `unrouteAll()` removes every
+route registered by the browser fixture, preserving configured site headers.
+Already running handlers finish under their existing attempt cleanup budget.
+A route survives
 `app.restart()`, `app.clearState()`, and session restore.
 The handler must decide exactly once with `fulfill`, `continue`, `fallback`,
 or `abort`; deciding twice or not at all is `ACTION_FAILED`. Routes run newest

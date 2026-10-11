@@ -234,6 +234,8 @@ export interface Browser extends Expectable<BrowserExpectation> {
   ): Promise<void>;
   /** Removes matching attempt-scoped routes. */
   unroute(pattern: string | RegExp): Promise<void>;
+  /** Removes all routes registered by this browser fixture, preserving configured site headers. */
+  unrouteAll(): Promise<void>;
   /** Waits for a matching response. */
   waitForResponse(
     pattern: string | RegExp,
@@ -477,6 +479,16 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
         }
       });
     },
+    unrouteAll(...args: unknown[]) {
+      requireNoArguments('browser.unrouteAll', args);
+      return surface.guard(context.operation(), 'unrouteAll', async () => {
+        for (let i = routes.length - 1; i >= 0; i -= 1) {
+          const stored = routes[i]!;
+          await surface.unroute(stored.predicate, stored.pwHandler);
+          routes.splice(i, 1);
+        }
+      });
+    },
     waitForResponse(pattern, options) {
       const wirePattern = toTextPattern(pattern);
       const operation = context.operation(options?.timeout);
@@ -645,6 +657,7 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
     addInitScript: { ...action, label: (script) => initScriptLabel(script) },
     route: { ...action, label: (pattern) => String(pattern) },
     unroute: { ...action, label: (pattern) => String(pattern) },
+    unrouteAll: action,
     waitForResponse: { ...action, timeout: (_pattern, options) => options?.timeout, label: (pattern) => String(pattern) },
     cookies: action,
     setCookies: action,
