@@ -1,8 +1,11 @@
 /** Cache config resolution and the staged-write settlement. */
 
 import path from 'node:path';
+import { chmod, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
 import { createAgentCacheContext, settleStagedTraces } from '../../src/cache/context.ts';
+import { FileCacheStore } from '../../src/cache/store.ts';
 import { buildTraceEntry, readTraceEntry } from '../../src/cache/trace.ts';
 import { resolveConfig } from '../../src/config/resolve.ts';
 import type { ActionTrace, E2EConfig, CacheStore } from '../../src/types.ts';
@@ -222,6 +225,26 @@ describe('settleStagedTraces', () => {
     expect(store.entries.get(KEY_A)).toBe(stored);
     expect(store.entries.has(KEY_B)).toBe(false);
     expect([...writes]).toEqual([[1, 'kept'], [3, 'evicted']]);
+  });
+
+  it.skipIf(process.platform === 'win32' || process.getuid?.() === 0)('does not report default-store eviction when the entry directory denies deletion', async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), 'e2e-cache-delete-'));
+    try {
+      const store = new FileCacheStore({ directory, maxBytes: 1_048_576, writable: true });
+      await store.write(KEY_B, trace('stale trailing flow'));
+      const entryPath = path.join(directory, `${KEY_B}.json`);
+      const before = await readFile(entryPath, 'utf8');
+      await chmod(directory, 0o500);
+      const context = contextWith(store);
+      context.staged.push({ kind: 'keep', keyHash: KEY_B, stepIndex: 3, recordedFor: STEP });
+      const writes = await settleStagedTraces(context, { lastVerifiedStepIndex: 2, implicatesUnconfirmed: true });
+      expect(await readFile(entryPath, 'utf8')).toBe(before);
+      expect(writes.has(3)).toBe(false);
+      await expect(store.delete('c'.repeat(64))).resolves.toBeUndefined();
+    } finally {
+      await chmod(directory, 0o700);
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it('does not report an eviction when a custom store rejects deletion, and still settles other entries', async () => {
