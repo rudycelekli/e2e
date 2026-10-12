@@ -224,6 +224,20 @@ describe('settleStagedTraces', () => {
     expect([...writes]).toEqual([[1, 'kept'], [3, 'evicted']]);
   });
 
+  it('does not report an eviction when a custom store rejects deletion, and still settles other entries', async () => {
+    const store = memoryStore();
+    const stored = JSON.stringify(buildTraceEntry(trace('replayed flow')));
+    store.entries.set(KEY_B, stored);
+    const context = contextWith({ ...store, delete: async () => { throw new Error('store unavailable'); } });
+    context.staged.push({ kind: 'keep', keyHash: KEY_B, stepIndex: 3, recordedFor: STEP });
+    context.staged.push({ kind: 'write', keyHash: KEY_A, trace: trace('confirmed'), stepIndex: 1 });
+    const writes = await settleStagedTraces(context, { lastVerifiedStepIndex: 2, implicatesUnconfirmed: true });
+    expect(store.entries.get(KEY_B)).toBe(stored);
+    expect(writes.has(3)).toBe(false);
+    expect(writes.get(1)).toBe('saved');
+    expect(store.entries.has(KEY_A)).toBe(true);
+  });
+
   it('leaves a confirmed kept entry that records no key context as stored, so a committed cache stays clean', async () => {
     const store = memoryStore();
     const stored = JSON.stringify(buildTraceEntry({ ...trace('replayed flow'), recordedFor: STEP }));

@@ -638,8 +638,12 @@ export class StepTraceSession {
    */
   private async evict(): Promise<void> {
     if (this.cache.store.delete === undefined) return;
-    this.cache.staged.push({ kind: 'decided', outcome: 'evicted', keyHash: this.keyHash, stepIndex: this.options.stepIndex });
-    await this.cache.store.delete(this.keyHash).catch(() => undefined);
+    try {
+      await this.cache.store.delete(this.keyHash);
+      this.cache.staged.push({ kind: 'decided', outcome: 'evicted', keyHash: this.keyHash, stepIndex: this.options.stepIndex });
+    } catch {
+      // An unavailable store must not leave a successful eviction outcome.
+    }
   }
 
   private repairedAfterEndMismatch(recorder: TraceRecorder): boolean {
