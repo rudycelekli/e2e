@@ -147,3 +147,17 @@ describe('compareSamples', () => {
     ]);
   });
 });
+
+
+it('reports both builds when both have unstable step sequences', () => {
+  const make = (api: string) => sampleFromReport(report({ one: [{ api, durationMs: 100 }] }), 200);
+  const comparison = compareSamples([make('agent.act'), make('app.open')], [make('agent.act'), make('app.close')], limits);
+  assert.deepEqual(comparison.changes, [
+    { kind: 'unstable', key: 'tests/a.e2e.ts › one (web)', side: 'base', variants: 2 },
+    { kind: 'unstable', key: 'tests/a.e2e.ts › one (web)', side: 'head', variants: 2 },
+  ]);
+  assert.equal(comparison.casesCompared, 0);
+  const markdown = renderMarkdown(header, comparison);
+  assert.match(markdown, /unstable on base/);
+  assert.match(markdown, /unstable on head/);
+});
