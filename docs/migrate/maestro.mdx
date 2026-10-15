@@ -2,6 +2,8 @@
 title: From Maestro
 description: Move Maestro flows to TypeScript with locators, assertions, and agent goals.
 icon: "/images/icons/maestro.svg"
+"og:image": "https://e2e.tester.army/docs/images/og/migrate/maestro.png?v=227549ed41"
+"twitter:image": "https://e2e.tester.army/docs/images/og/migrate/maestro.png?v=227549ed41"
 ---
 
 import { SetupPrompt } from '../snippets/setup-prompt-card.jsx';
@@ -30,6 +32,8 @@ use the same simulator or emulator while you move one flow at a time.
 <Prompt description={migrationPrompt} children={migrationPrompt} actions={["copy", "cursor"]} />
 
 </SetupPrompt>
+
+For a migration that spans several sessions, the [`migrate-to-e2e` skill](/coding-agents#migrate-an-existing-suite) records what moved in a progress file and keeps the old suite running until you retire each test.
 
 ## Port the config
 
@@ -178,12 +182,12 @@ declares `requires: ['device']` and other targets skip it. Calls on `screen`,
 | --- | --- | --- |
 | `setLocation` | `device.setLocation({ latitude, longitude })` | device only |
 | `travel: { points }` | `device.setLocation` in a loop | device only |
-| `setAirplaneMode`, `toggleAirplaneMode` | `device.setAirplaneMode(true)` or `false`, the state you want | device only |
+| `setAirplaneMode`, `toggleAirplaneMode` | `device.setAirplaneMode(true)` or `false`, the state you want; `true` is Android only | device only |
 | `setDarkMode`, `toggleDarkMode` | `device.setAppearance('dark')` or `'light'` | device only |
 | `setOrientation` | `device.setOrientation('landscape-left')` | device only |
 | `setPermissions` | `device.setPermission(name, 'grant' \| 'deny' \| 'reset')`, one permission per call, on the open app | device only |
 | a second `appId` mid-flow | `device.openApp(id)`; the `open_app` tool lets the agent switch inside a goal, see [Agent tools](/mobile#agent-tools) | device only |
-| platform-specific selectors | `device.locator('role=StaticText label="..."')`, agent-device's selector terms | device only |
+| platform-specific selectors | `device.locator('role=text label="..."')`, agent-device's selector terms | device only |
 
 </Accordion>
 <Accordion title="AI commands and flow control">
@@ -208,10 +212,12 @@ declares `requires: ['device']` and other targets skip it. Calls on `screen`,
 
 Four differences from Maestro's selectors cause most edits.
 
-- Maestro reads text and id as regular expressions, so `tapOn: ".*Save.*"`
-  matches any text with Save in it. `getByText` and `getByTestId` match the
-  whole string. Write `getByText(/Save/)` or `getByTestId(/^row-/)` for a
-  pattern, or `{ exact: false }` for a case-insensitive substring of text.
+- Maestro reads text and id as case-insensitive regular expressions, so
+  `tapOn: ".*Save.*"` matches any text with Save in it, and `"Mute Account"`
+  matches `Mute account`. `getByText` and `getByTestId` match the whole
+  string, case included. Write `getByText(/^mute account$/i)` or
+  `getByTestId(/^row-/)` for a pattern, or `{ exact: false }` for a
+  case-insensitive substring of text.
 - Maestro taps the first of several matches. e2e fails with
   `LOCATOR_AMBIGUOUS`, so write `.first()` when the first match is what you
   mean.

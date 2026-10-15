@@ -16,10 +16,7 @@ import type { Browser, RouteContinueOverrides, RouteFulfillResponse, WebRoute } 
 ({ headers: { 'x-n': 1 } }) satisfies RouteContinueOverrides;
 
 declare const browser: Browser;
-void (browser.keyboard.down('Shift') satisfies Promise<void>);
-void (browser.keyboard.up('Shift') satisfies Promise<void>);
-// @ts-expect-error key names must be strings
-void browser.keyboard.down(42);
+void (browser.waitForDownload(async () => {}).then(file => file.absolutePath) satisfies Promise<string>);
 
 declare const route: WebRoute;
 void route.continue();

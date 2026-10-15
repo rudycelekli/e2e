@@ -5,7 +5,7 @@ description: Launch, check, drive, prove, and bug bash the e2e playground web ap
 
 # Verify the playground
 
-Read `.agents/skills/e2e/SKILL.md` first. This skill only says what is true
+Read the e2e skill first (`npx e2e guide` prints it). This skill only says what is true
 of this app. The config is `e2e.config.ts` (target `web`, tests
 `tests/**/*.e2e.ts`); the bug bash uses `e2e.bugbash.config.ts`.
 
@@ -29,8 +29,11 @@ npx e2e run tests/smoke.e2e.ts        # starts the app, opens it, pins the Playg
 `list` failing is the config or a dependency. `run` failing with
 `APP_ALREADY_RUNNING` is a server of yours on the port, and
 `LOCATOR_NOT_FOUND` on the heading is the app itself. A signed-in check
-is `npx e2e run tests/auth.setup.e2e.ts`, which saves the `admin` and
-`admin-cookie` sessions. Run Doctor first whenever anything looks off.
+is a test that consumes a named session, `npx e2e run
+tests/dashboard.e2e.ts`: selecting it runs the `admin` setup behind it
+and checks the restored signed-in state. Running `tests/auth.setup.e2e.ts` on
+its own selects no test and exits `NO_TESTS`. Run Doctor first whenever
+anything looks off.
 
 ## Drive
 

@@ -50,6 +50,8 @@ This project is a pnpm monorepo. `packages/` holds what publishes to npm,
 - `docs/`: the docs site, built with [Mintlify](https://mintlify.com)
 - `skills/e2e/`: the agent skill shipped with the package and installed by `e2e init`
 - `skills/create-verification-skill/`: the generator of a project-local `verify-<app>` skill, installed with `npx skills add tester-army/e2e --skill create-verification-skill`
+- `skills/migrate-to-e2e/`: ports an existing Playwright, Cypress, Selenium, Detox, or Maestro suite one slice at a time, installed with `npx skills add tester-army/e2e --skill migrate-to-e2e`
+- `plugins/e2e/`: the Claude Code and Codex plugin of the three skills, installed from this repository as a marketplace with `claude plugin marketplace add tester-army/e2e` or `codex plugin marketplace add tester-army/e2e`
 - `.dev/skills/`: the skills coding agents use to work on this repo, symlinked from `.claude/skills/` so `npx skills add tester-army/e2e` offers only `skills/*`
 
 On Windows, enable Developer Mode and clone with
@@ -86,9 +88,20 @@ page under `docs/` in the same review, and `skills/e2e/` when the
 skill describes that surface.
 
 ```sh
-pnpm docs:dev     # local preview
-pnpm docs:check   # validate the site, its links, and the quickstart examples
+pnpm docs:dev     # render the Open Graph cards, then preview locally
+pnpm docs:og      # render the Open Graph cards for new or changed pages
+pnpm docs:check   # validate the site, its links, the quickstart examples, and the cards
 ```
+
+Every page in the navigation except the home page has its own social
+preview card under `docs/images/og/`, drawn from its title, description, and
+navigation section by `docs/og/generate.tsx` with `@vercel/og`. Mintlify runs
+no build step of ours, so the cards and the `og:image` and `twitter:image`
+lines the script writes into each page's frontmatter are committed. A new
+page, a renamed one, one moved to another navigation section, or an edited
+title or description needs `pnpm docs:og`;
+`pnpm docs:check` fails until it has run. A page with no card falls back to
+the brand card, `docs/images/og.png`, set site-wide in `docs/docs.json`.
 
 A change that claims to be faster, or that touches the runner, the agent
 loop, or an engine, gets measured against `main` on the benchmark suites:
@@ -130,6 +143,13 @@ If your change affects `e2e`, `@e2e-dev/web`, `@e2e-dev/mobile`, or
 ```sh
 pnpm changeset
 ```
+
+While a package is `0.x`, a feature or fix is a `patch`. A breaking change
+is a `minor` whose summary opens with `**Breaking:**`. A release a maintainer
+calls (a big launch, `1.0`) opens with `**Release:**` and may be a `minor` or
+`major`. `pnpm check` fails on any other `0.x` minor or major. `e2e init` writes
+`^0.x.y`, which on `0.x` takes patches only, so features as patches reach
+users without a `package.json` edit.
 
 Changes limited to the apps (testbed, web benchmark, mobile benchmark), docs,
 or CI don't need one. Everything under `apps/` is private and skipped entirely
@@ -252,8 +272,8 @@ prompts and tool descriptions.
   on, twice a year.
 - Removal happens at the end of the window, in a minor release while the
   packages are `0.x` (semver treats `0.x` minors as breaking) and in a major
-  release from `1.0` onward. The changeset body names both the removed form
-  and its replacement, and the PR title carries the `!`.
+  release from `1.0` onward. The changeset body opens with `**Breaking:**`,
+  names both the removed form and its replacement, and the PR title carries the `!`.
 - A deprecation is announced in three places when it lands: the changeset
   (so it reaches the changelog and the GitHub release), the reference page
   for the surface, and a runtime warning the first time the old form is used

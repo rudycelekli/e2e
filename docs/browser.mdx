@@ -2,6 +2,8 @@
 title: Working with the browser
 description: Mock an API, handle a dialog, download a file, reach into an iframe, and pick a browser.
 icon: "window-maximize"
+"og:image": "https://e2e.tester.army/docs/images/og/browser.png?v=9e41078fc1"
+"twitter:image": "https://e2e.tester.army/docs/images/og/browser.png?v=9e41078fc1"
 ---
 
 The `browser` fixture of `@e2e-dev/web` mocks requests, handles dialogs,
@@ -76,13 +78,18 @@ A function handler gets the dialog and must call `accept(text?)` or
 ## Download a file
 
 ```ts
+import { readFile } from 'node:fs/promises';
+
 const file = await browser.waitForDownload(() =>
   screen.getByRole('link', 'Export CSV').tap(),
 );
+const csv = await readFile(file.absolutePath, 'utf8');
+expect(csv).toContain('Invoice');
 ```
 
-e2e saves the file as a `download` artifact. `file.path` is relative to the
-attempt's artifact directory, not to the project.
+e2e saves the file as a `download` artifact. Read it through
+`file.absolutePath`, which works with hosted browsers too. `file.path` is
+relative to the attempt's artifact directory, not to the project.
 
 ## Reach into an iframe
 
@@ -136,6 +143,26 @@ await app.open('/raffle');
 ```
 
 See [init scripts](/reference/web#init-scripts).
+
+## Emulate dark mode and reduced motion
+
+`colorScheme` and `reducedMotion` set what the page's `@media` rules and
+`matchMedia` read, from the first paint. For every test:
+
+```ts
+web({ colorScheme: 'dark', reducedMotion: 'reduce' })
+```
+
+For one test, call `browser.emulateMedia`. Call it before the page opens to
+load the page with those values:
+
+```ts
+await browser.emulateMedia({ reducedMotion: 'reduce' });
+await app.open('/');
+```
+
+A value holds for the rest of the test, through `app.restart()` and
+`app.clearState()`. See [media emulation](/reference/web#media-emulation).
 
 ## Cookies
 
