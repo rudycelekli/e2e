@@ -266,7 +266,7 @@ a page acts on that tab: `goto`, `reload`, `back`, `forward`, `url`, `title`,
 `waitForURL`, `locator`, `frameLocator`, `evaluate`, `waitForResponse`,
 `waitForDownload`, `keyboard`, `mouse`, the `expect(browser)` matchers, and
 every `screen` query. What belongs to the browser covers every tab:
-`cookies`, `setCookies`, `route`, `unroute`, `onDialog`, and `addInitScript`. `setViewport`
+`cookies`, `setCookies`, `clearCookies`, `route`, `unroute`, `onDialog`, and `addInitScript`. `setViewport`
 sizes the active tab and every tab opened after it, and `emulateMedia` sets
 its media the same way.
 
@@ -385,7 +385,7 @@ export interface Browser extends Expectable<BrowserExpectation> {
 | `goto`, `reload`, `back`, `forward` | `config.timeout`, 120000 ms, the same budget `app.open()` uses; `{ timeout }` overrides, capped by the test deadline |
 | `waitForResponse`, `waitForDownload` | `config.actionTimeout`, 30000 ms; `{ timeout }` overrides, capped by the test deadline |
 | `waitForURL` | `config.assertionTimeout`, 5000 ms |
-| `url`, `title`, `evaluate`, `addInitScript`, `route`, `unroute`, `cookies`, `setCookies`, `setViewport`, `emulateMedia`, `onDialog`, `keyboard.*`, `mouse.*` | `config.actionTimeout`, 30000 ms, not overridable |
+| `url`, `title`, `evaluate`, `addInitScript`, `route`, `unroute`, `cookies`, `setCookies`, `clearCookies`, `setViewport`, `emulateMedia`, `onDialog`, `keyboard.*`, `mouse.*` | `config.actionTimeout`, 30000 ms, not overridable |
 
 Every `browser` call is a recorded `browser.<method>` step, except `locator` and
 `frameLocator`: they build a locator without touching the page, and the
@@ -641,12 +641,9 @@ await browser.clearCookies({ name: /^session/, path: '/' });
 
 ### Clearing cookies
 
-`browser.clearCookies()` removes every cookie in this attempt's browser context.
-Pass `{ name?, domain?, path? }` to remove only cookies matching every supplied
-filter. A string matches the full field; a RegExp matches that field's text.
-This also removes HttpOnly cookies. Local storage, IndexedDB and session storage
-stay intact, so tests can clear a login cookie without resetting app preferences.
-Unknown filters and values other than strings or RegExp fail with `INVALID_ARGUMENT`.
+`browser.clearCookies({ name?, domain?, path? })` removes the cookies matching
+every filter given. A string matches the field exactly; a RegExp matches its
+text. With no options it removes every cookie. Other storage stays.
 
 ```ts
 export interface CookieFilter {
