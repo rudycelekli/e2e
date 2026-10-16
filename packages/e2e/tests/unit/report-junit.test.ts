@@ -123,6 +123,52 @@ describe('renderJunitReport', () => {
     expect(rootAttributes(xml)).toMatchObject({ tests: '1', failures: '0', errors: '0' });
   });
 
+  it('times a failed test by its failed attempt when the run interrupted its retry', () => {
+    const xml = render(
+      reportDocument({
+        results: [
+          reportResult({
+            status: 'failed',
+            attempts: [
+              reportAttempt({ index: 0, status: 'failed', durationMs: 5000, error: reportError() }),
+              reportAttempt({ id: 'attempt-2', index: 1, status: 'interrupted', durationMs: 20 }),
+            ],
+          }),
+        ],
+      }),
+    );
+    expect(xml).toContain('time="5.000">');
+  });
+
+  it('times a failed serial member by its failed attempt when the run interrupted the retry', () => {
+    const member = { index: 0, testId: 'test-1', startedAt: AT, steps: [], secondaryErrors: [] };
+    const group: ReportSerialGroup = {
+      id: 'group-1',
+      serialId: 'checkout',
+      declarationIndex: 0,
+      file: 'tests/checkout.e2e.ts',
+      source: { file: 'tests/checkout.e2e.ts', line: 1, column: 1 },
+      titlePath: ['checkout'],
+      targetId: 'web',
+      platform: 'web',
+      agent: 'default',
+      repeat: 0,
+      memberTestIds: ['test-1'],
+      status: 'failed',
+      attempts: [
+        { ...reportAttempt({ status: 'failed', durationMs: 1300 }), members: [{ ...member, id: 'member-1', status: 'failed', durationMs: 1250, error: reportError() }] },
+        { ...reportAttempt({ id: 'attempt-2', index: 1, status: 'interrupted', durationMs: 20 }), members: [{ ...member, id: 'member-2', status: 'skipped', durationMs: 0 }] },
+      ],
+    };
+    const xml = render(
+      reportDocument({
+        serialGroups: [group],
+        results: [reportResult({ status: 'failed', serialGroupId: 'group-1', attempts: [] })],
+      }),
+    );
+    expect(xml).toContain('time="1.250">');
+  });
+
   it('renders a test-category error as <failure> with code, message, and body', () => {
     const xml = render(
       reportDocument({

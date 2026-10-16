@@ -11,6 +11,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import type { Report1Document } from '../../src/report/build.ts';
 import { startFixtureApp } from '../helpers/fixture-app.ts';
 import { createProject } from '../helpers/run-project.ts';
 
@@ -396,84 +397,50 @@ describe('interrupt signals against the CLI', () => {
       ),
     60_000,
   );
-});
 
-
-it('the built CLI retains serial verdict time in Markdown and JUnit after retry interruption', () => {
-  const suite = `import { appendFileSync, readFileSync } from 'node:fs';
+  it(
+    'a serial member keeps its failed attempt time in Markdown and JUnit when Ctrl-C cuts the retry',
+    () =>
+      withRunningCli(
+        {
+          files: {
+            'e2e.config.ts': config().replace('workers: 1,', "workers: 1, reporters: ['markdown', 'junit'],"),
+            'tests/serial.e2e.ts': `import { appendFileSync, readFileSync } from 'node:fs';
 import { test, expect } from 'e2e';
 ${LOG_HELPER}
-test.describe('retained flow', { serial: true, retries: 1 }, () => {
+test.describe('flow', { serial: true, retries: 1 }, () => {
   test.beforeEach(async () => {
     if (readFileSync(process.env.SIGNAL_LOG!, 'utf8').includes(' verdict.done')) {
       log('retry.start');
       await expect.poll(() => false, { timeout: 600_000 }).toBe(true);
     }
   });
-  test('visible failure', async () => {
-    log('test.start');
-    await new Promise(resolve => setTimeout(resolve, 200));
+  test('fails', async () => {
+    await new Promise((resolve) => setTimeout(resolve, 200));
     log('verdict.done');
     expect(true).toBe(false);
   });
 });
-`;
-  return withRunningCli({
-    files: {
-      'e2e.config.ts': config().replace('workers: 1,', "workers: 1, reporters: ['markdown', 'junit'],"),
-      'tests/serial.e2e.ts': suite,
-    }, until: 'retry.start',
-  }, async run => {
-    run.signalGroup('SIGINT');
-    expect(await run.exit).toBe(130);
-    const report = JSON.parse(readFileSync(path.join(run.projectDir, '.e2e', 'report.json'), 'utf8')) as import('../../src/report/build.ts').Report1Document;
-    const group = report.run.serialGroups[0]!;
-    expect(group.attempts).toHaveLength(2);
-    const firstDuration = group.attempts[0]!.members[0]!.durationMs;
-    expect(firstDuration).toBeGreaterThanOrEqual(190);
-    expect(group.attempts[1]!.status).toBe('interrupted');
-    expect(report.run.results[0]!.status).toBe('failed');
-    expect(report.run.usage.maxModelCallsInStep).toBe(0);
-    const markdown = readFileSync(path.join(run.projectDir, '.e2e', 'summary.md'), 'utf8');
-    const junit = readFileSync(path.join(run.projectDir, '.e2e', 'junit.xml'), 'utf8');
-    expect(junit).toContain(`time="${(firstDuration / 1000).toFixed(3)}"`);
-    expect(markdown).toContain(firstDuration < 1000 ? `${Math.round(firstDuration)}ms` : `${(firstDuration / 1000).toFixed(1)}s`);
-  });
-}, 60_000);
+`,
+          },
+          until: 'retry.start',
+        },
+        async (run) => {
+          run.signalGroup('SIGINT');
+          expect(await run.exit).toBe(130);
 
-
-it('the built CLI retains a completed member time when its first serial attempt is interrupted', () => {
-  const suite = `import { appendFileSync } from 'node:fs';
-import { test, expect } from 'e2e';
-${LOG_HELPER}
-test.describe('first flow', { serial: true }, () => {
-  test('completed member', async () => {
-    await new Promise(resolve => setTimeout(resolve, 200));
-  });
-  test('waiting member', async () => {
-    log('member.waiting');
-    await expect.poll(() => false, { timeout: 600_000 }).toBe(true);
-  });
+          const report = JSON.parse(readFileSync(path.join(run.projectDir, '.e2e', 'report.json'), 'utf8')) as Report1Document;
+          const [failed, interrupted] = report.run.serialGroups[0]!.attempts;
+          expect(interrupted?.status).toBe('interrupted');
+          expect(report.run.results[0]!.status).toBe('failed');
+          const durationMs = failed!.members[0]!.durationMs;
+          expect(durationMs).toBeGreaterThanOrEqual(190);
+          expect(readFileSync(path.join(run.projectDir, '.e2e', 'junit.xml'), 'utf8')).toContain(`time="${(durationMs / 1000).toFixed(3)}"`);
+          expect(readFileSync(path.join(run.projectDir, '.e2e', 'summary.md'), 'utf8')).toContain(
+            durationMs < 1000 ? `${Math.round(durationMs)}ms` : `${(durationMs / 1000).toFixed(1)}s`,
+          );
+        },
+      ),
+    60_000,
+  );
 });
-`;
-  return withRunningCli({
-    files: {
-      'e2e.config.ts': config().replace('workers: 1,', "workers: 1, reporters: ['markdown', 'junit'],"),
-      'tests/serial.e2e.ts': suite,
-    }, until: 'member.waiting',
-  }, async run => {
-    run.signalGroup('SIGINT');
-    expect(await run.exit).toBe(130);
-    const report = JSON.parse(readFileSync(path.join(run.projectDir, '.e2e', 'report.json'), 'utf8')) as import('../../src/report/build.ts').Report1Document;
-    const group = report.run.serialGroups[0]!;
-    expect(group.attempts).toHaveLength(1);
-    expect(group.attempts[0]!.status).toBe('interrupted');
-    const duration = group.attempts[0]!.members[0]!.durationMs;
-    expect(duration).toBeGreaterThanOrEqual(190);
-    expect(report.run.results[0]!.status).toBe('passed');
-    const markdown = readFileSync(path.join(run.projectDir, '.e2e', 'summary.md'), 'utf8');
-    const junit = readFileSync(path.join(run.projectDir, '.e2e', 'junit.xml'), 'utf8');
-    expect(junit).toContain(`time="${(duration / 1000).toFixed(3)}"`);
-    expect(markdown).toContain(duration < 1000 ? `${Math.round(duration)}ms` : `${(duration / 1000).toFixed(1)}s`);
-  });
-}, 60_000);

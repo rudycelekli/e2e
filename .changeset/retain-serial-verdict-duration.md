@@ -2,6 +2,4 @@
 "e2e": patch
 ---
 
-Keep a serial member's measured duration with the verdict retained after an interrupted retry or a retry that never reached it. Markdown and JUnit timing no longer replace a completed member's duration with the skipped retry's zero.
-
-Preserve completed member timing when the first attempt is interrupted too.
+Report a failed test's duration from its failed attempt when the run interrupts its retry, instead of the retry's time.

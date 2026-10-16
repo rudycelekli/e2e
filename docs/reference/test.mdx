@@ -323,12 +323,8 @@ cannot start, because its file fails to load or its session fails to launch,
 fails the first member with that error and skips the rest with cause
 `serial-predecessor-failed`. When the run is interrupted during the launch,
 every member skips instead. On a retry, the members keep the verdicts of
-the attempt before it. A retained verdict keeps its measured duration in
-the report, Markdown summary, and JUnit output; a retry that skipped the
-member or was interrupted does not replace that duration with zero. A member
-that completed in an interrupted first attempt keeps its measured duration too.
-The exit code follows the error's category, as for any
-other test.
+the attempt before it, and its duration. The exit code follows the error's
+category, as for any other test.
 
 ## Fixtures
 
