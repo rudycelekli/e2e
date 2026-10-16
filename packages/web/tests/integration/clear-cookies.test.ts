@@ -74,7 +74,7 @@ describe('browser.clearCookies', () => {
 
   /** The remaining cookies as sorted `name=value` pairs. */
   const remaining = async (): Promise<string[]> =>
-    (await browser.cookies()).map((cookie) => `${cookie.name}=${cookie.value}`).sort();
+    (await browser.cookies()).map((cookie) => `${cookie.name}=${cookie.value}`).toSorted();
 
   it.each<[string, CookieFilter, string[]]>([
     ['combines filters', { name: 'session', path: '/admin' }, ['language=en', 'session-id=x', 'session=root']],
