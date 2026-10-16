@@ -251,9 +251,7 @@ executor takes that choice with probability 1 and confidence 0, so a
 - The text model that names a drawn control doesn't see pixels. It can't
   follow an instruction that exists only as drawn text, such as a wizard
   that paints "tap the circle".
-- Every decide call and text call counts against `maxModelCalls`. A response
-  received during cancellation contributes its reported tokens while the
-  step is open. Responses after step closure are not accounted.
+- Every decide call and text call counts against `maxModelCalls`.
 - Three actions in a row that fail or change nothing block the step with
   `AUTOMATION_UNSUPPORTED`.
 - A question the provider refuses fails the step with `MODEL_OUTPUT_INVALID`.

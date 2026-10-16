@@ -2,4 +2,4 @@
 "@e2e-dev/decision": patch
 ---
 
-Record returned token usage and the served model when cancellation discards an answer before step closure.
+Count the tokens and served model of a model call that returns while its step is being cancelled.
