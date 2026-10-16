@@ -284,7 +284,7 @@ describe('settleStagedTraces', () => {
       context.staged.push({ kind: 'keep', keyHash: KEY_B, stepIndex: 3, recordedFor: STEP });
       const writes = await settleStagedTraces(context, { lastVerifiedStepIndex: 2, implicatesUnconfirmed: true });
       expect(await readFile(entryPath, 'utf8')).toBe(before);
-      expect(writes.has(3)).toBe(false);
+      expect(writes.get(3)).toBe('unconfirmed');
       await expect(store.delete('c'.repeat(64))).resolves.toBeUndefined();
     } finally {
       await chmod(directory, 0o700);
@@ -301,9 +301,16 @@ describe('settleStagedTraces', () => {
     context.staged.push({ kind: 'write', keyHash: KEY_A, trace: trace('confirmed'), stepIndex: 1 });
     const writes = await settleStagedTraces(context, { lastVerifiedStepIndex: 2, implicatesUnconfirmed: true });
     expect(store.entries.get(KEY_B)).toBe(stored);
-    expect(writes.has(3)).toBe(false);
+    expect(writes.get(3)).toBe('unconfirmed');
     expect(writes.get(1)).toBe('saved');
     expect(store.entries.has(KEY_A)).toBe(true);
+  });
+
+  it('reports a new recording as unconfirmed when a custom store rejects its deletion', async () => {
+    const context = contextWith({ ...memoryStore(), delete: async () => { throw new Error('store unavailable'); } });
+    context.staged.push({ kind: 'write', keyHash: KEY_A, trace: trace('unconfirmed'), stepIndex: 3 });
+    const writes = await settleStagedTraces(context, { lastVerifiedStepIndex: 2, implicatesUnconfirmed: true });
+    expect([...writes]).toEqual([[3, 'unconfirmed']]);
   });
 
   it('leaves a confirmed kept entry that records no key context as stored, so a committed cache stays clean', async () => {

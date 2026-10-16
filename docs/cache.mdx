@@ -173,10 +173,9 @@ page on any other origin is another route.
 
 ## Why a step was not replayed
 
-Each `act` step reports `step.cache` when caching is on. `agent.act()` returns
-it as `result.cache`, without the attempt-end `write` outcome; the
-[trace page](/debugging#traces) shows it under the step. A rejected custom
-store deletion leaves `write` absent rather than reporting an eviction.
+Each `act` step reports `step.cache`, absent when caching is off for the
+step. `agent.act()` returns it as `result.cache`, without `write`, and the
+[trace page](/debugging#traces) shows it under the step.
 
 | Run summary | `step.cache.mode` | Meaning |
 | --- | --- | --- |
