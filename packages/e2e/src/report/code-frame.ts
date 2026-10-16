@@ -43,7 +43,8 @@ export function codeFrame(frame: StackFrame, pc: Colors): string[] {
       const prefix = bounded((lines[i] ?? '').slice(0, Math.max(0, frame.column - 1)));
       const column = visibleWidth(prefix);
       // A clipped-away location has no visible token to annotate.
-      if (column < maxChars && (text === raw.trimEnd() || column < visibleWidth(text) - 1)) {
+      const limit = text === raw.trimEnd() ? maxChars : visibleWidth(text) - 1;
+      if (column < limit) {
         rows.push(`${gutter()}${' '.repeat(column + 1)}${pc.red('^')}`);
       }
     }

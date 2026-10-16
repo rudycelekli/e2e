@@ -2,18 +2,25 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import picocolors from 'picocolors';
-import { afterAll, afterEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import { codeFrame } from '../../src/report/code-frame.ts';
 import { visibleWidth } from '../../src/report/format.ts';
 
 const directory = mkdtempSync(path.join(tmpdir(), 'e2e-code-frame-width-'));
 const file = path.join(directory, 'source.ts');
 const pc = picocolors.createColors(false);
-afterEach(() => { vi.unstubAllGlobals(); rmSync(file, { force: true }); });
+const savedColumns = process.stdout.columns;
+afterEach(() => { setColumns(savedColumns); rmSync(file, { force: true }); });
 afterAll(() => { rmSync(directory, { recursive: true, force: true }); });
 
+/** Sets the terminal width the code frame measures against. */
+function setColumns(columns: number | undefined): void {
+  Object.defineProperty(process.stdout, 'columns', { value: columns, configurable: true, writable: true });
+}
+
+/** Writes `line` as the source file and renders its code frame on a terminal `columns` wide. */
 function render(line: string, column: number, columns = 80): string[] {
-  vi.stubGlobal('process', { ...process, stdout: { ...process.stdout, columns } });
+  setColumns(columns);
   writeFileSync(file, line);
   return codeFrame({ file, line: 1, column }, pc);
 }
