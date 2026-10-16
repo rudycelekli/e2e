@@ -1,0 +1,59 @@
+name: Fork e2e1050 native qualification
+on:
+  push:
+    branches: [validation/e2e1050-native-20261016]
+permissions:
+  contents: read
+concurrency:
+  group: fork-e2e1050-native
+  cancel-in-progress: false
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      E2E_TELEMETRY_DISABLED: '1'
+      DO_NOT_TRACK: '1'
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: f054819717718ba50bafe7639799e079f1079b1d
+          fetch-depth: 3
+          persist-credentials: false
+      - name: Guard frozen source
+        run: |
+          test "$(git rev-parse HEAD)" = f054819717718ba50bafe7639799e079f1079b1d
+          test "$(git rev-parse HEAD^{tree})" = d04dc29a96152f85c4c7d4b55e9c300af5516e55
+          test "$(git show -s --format=%P HEAD)" = "eb1f8a9651c3761b62100ab5f2c6aa3e7030899c ff3bf3917f2b5bb0f81e5bc5f4fdaa24d023afd0"
+          git diff --exit-code
+      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
+        with:
+          version: 12.3.4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 26
+      - name: Install exact lockfile and build native packages
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+      - name: Native dialog kinds unit regressions
+        run: pnpm --filter @e2e-dev/web exec vitest run tests/unit/dialogs.test.ts
+      - name: Native full core unit suite
+        run: pnpm --filter e2e run test:unit
+      - name: Required full repository checks
+        run: pnpm check
+      - name: Install deterministic local Chromium
+        run: node packages/web/dist/bin.js install chromium --with-deps
+      - name: Native browser routes and dialog composition
+        run: pnpm --filter @e2e-dev/web exec vitest run tests/integration/routes.test.ts
+      - name: Built CLI deterministic testbed
+        run: pnpm --filter @e2e-dev/testbed test
+      - name: Built CLI deterministic web benchmark
+        run: pnpm --filter @e2e-dev/web-benchmark test
+      - name: Final frozen source guard
+        if: always()
+        run: |
+          test "$(git rev-parse HEAD)" = f054819717718ba50bafe7639799e079f1079b1d
+          test "$(git rev-parse HEAD^{tree})" = d04dc29a96152f85c4c7d4b55e9c300af5516e55
+          git diff --exit-code
