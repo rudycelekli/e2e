@@ -2,6 +2,8 @@
 title: Coding agents
 description: Give a coding agent the skill, a live app session, and reports it can use to write and debug tests.
 icon: "robot"
+"og:image": "https://e2e.tester.army/docs/images/og/coding-agents.png?v=c6990935d7"
+"twitter:image": "https://e2e.tester.army/docs/images/og/coding-agents.png?v=c6990935d7"
 ---
 
 A coding agent such as Claude Code, Codex, or Cursor can write, run, and
@@ -32,7 +34,8 @@ bunx e2e init
 The copy holds `SKILL.md` and topic references. After you upgrade e2e, run
 `init` again to update it. Without `init`, `npx skills add tester-army/e2e`
 installs the skill, and `npx e2e guide [topic]` prints it from the
-installed package.
+installed package. The Claude Code and Codex plugin below installs all
+three e2e skills for every project.
 
 `init` leaves your project instructions unchanged. For agents that need a
 pointer, add this line:
@@ -45,32 +48,49 @@ The package also ships these docs as `.mdx` pages for offline reading, in
 `node_modules/e2e/docs` in a single-package project. A link such as
 `/reference/cli` is `docs/reference/cli.mdx`.
 
-## Let the agent use the app
+<Accordion title="Install the Claude Code or Codex plugin">
 
-`e2e mcp` lets the coding agent open the app and use it. Each agent,
-subagents included, opens its own session, so several can use the app at
-the same time. The `locate` tool checks a `screen.*` locator against the
-current app and returns the test code when exactly one element matches.
-
-`init` registers the server in `.mcp.json` for Claude Code and
-`.cursor/mcp.json` for Cursor. To register it with Claude Code by hand:
+The e2e repository is a plugin marketplace for both clients:
 
 <CodeGroup>
-```bash npm
-claude mcp add e2e -- npx e2e mcp
+```bash Claude
+claude plugin marketplace add tester-army/e2e
+claude plugin install e2e@e2e
 ```
 
-```bash pnpm
-claude mcp add e2e -- pnpm exec e2e mcp
-```
-
-```bash bun
-claude mcp add e2e -- bunx e2e mcp
+```bash Codex
+codex plugin marketplace add tester-army/e2e
+codex plugin add e2e@e2e
 ```
 </CodeGroup>
 
-The server does not run tests. See the [MCP server reference](/reference/mcp)
-for its tools, session rules, and flags.
+Start a new session. The plugin adds the `e2e`,
+`create-verification-skill`, and `migrate-to-e2e` skills, not the npm
+package or the MCP server. Invoke the other two under the plugin's name:
+`/e2e:<skill>` in Claude Code, `$e2e:<skill>` in Codex.
+
+The plugin's version follows e2e releases. To update it, run these and
+start a new session:
+
+<CodeGroup>
+```bash Claude
+claude plugin marketplace update e2e
+claude plugin update e2e@e2e
+```
+
+```bash Codex
+codex plugin marketplace upgrade e2e
+```
+</CodeGroup>
+
+</Accordion>
+
+## Let the agent use the app
+
+`e2e mcp` gives the agent a live session on your app. It checks each
+locator against the screen before it writes the test, and checks its own UI
+changes. `init` registers the server. See [MCP server](/mcp) for setup and
+prompts.
 
 ## How an agent writes and runs a test
 
@@ -88,13 +108,16 @@ test('a signed-in user reaches checkout', async ({ screen, app, agent }) => {
   await screen.getByRole('button', 'Sign in').click();
   await expect(screen.getByRole('heading', 'Welcome back')).toBeVisible();
 
-  await agent.act('Add the cheapest item on the page to the cart and open the cart');
+  await agent.act('Add the cheapest item on the page to the cart');
+  await expect(screen.getByRole('status', 'Cart')).toHaveText('1 item');
+  await agent.act('Open the cart');
   await expect(screen.getByRole('heading', 'Your cart')).toBeVisible();
 });
 ```
 
-- **One `agent.act` per goal, then an `expect`.** The `expect` fails when
-  the agent did the wrong thing. A locator matcher, or another
+- **One `agent.act` per [atomic goal](/core-concepts#goals), then an
+  `expect`.** The `expect` fails when the agent did the wrong thing. A
+  locator matcher, or another
   [verification check](/cache#when-a-recording-is-written), also lets the
   cache replay the step.
 - **No sleeps.** Locators poll, actions wait for their target, and `expect`
@@ -176,6 +199,35 @@ skill for the rest. It is based on
 [create-verification-skill](https://github.com/cursor/plugins/tree/main/pstack/skills/create-verification-skill)
 from poteto's pstack, with e2e in place of a hand-rolled harness.
 </Accordion>
+
+## Migrate an existing suite
+
+The `migrate-to-e2e` skill moves a Playwright, Cypress, Selenium, Detox,
+or Maestro suite to e2e one slice per session. The old suite keeps
+running beside the new tests, so you can stop after any session.
+
+<CodeGroup>
+```bash npm
+npx skills add tester-army/e2e --skill migrate-to-e2e
+```
+
+```bash pnpm
+pnpm dlx skills add tester-army/e2e --skill migrate-to-e2e
+```
+
+```bash bun
+bunx skills add tester-army/e2e --skill migrate-to-e2e
+```
+</CodeGroup>
+
+Then ask the agent for `/migrate-to-e2e`. It ports the slice you pick and
+runs each ported test three times on every target. A `MIGRATION.md` file
+records progress for the next session. Optionally, the agent plants a temporary bug
+in the app, such as a wrong checkout total, and checks whether both
+suites fail on it. The agent deletes an old test only when you confirm. It first reads the migration guide for your runner:
+[Playwright](/migrate/playwright), [Cypress](/migrate/cypress),
+[Selenium](/migrate/selenium), [Detox](/migrate/detox), or
+[Maestro](/migrate/maestro).
 
 ## Next
 
