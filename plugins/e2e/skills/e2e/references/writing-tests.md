@@ -178,7 +178,8 @@ substring; a `RegExp` matches as written.
 - Narrow with `filter({ hasText })` (a case-insensitive substring, unlike a
   query), `filter({ has: locator })`, `first()`, `last()`, `nth(i)`, or
   scoping under another locator. Any other `filter` key (`hasNot`,
-  `hasNotText`) or an empty `filter({})` is `INVALID_LOCATOR`.
+  `hasNotText`) or an empty `filter({})` is `INVALID_LOCATOR`. `a.or(b)`
+  matches either, still strict: add `first()` when both may match.
 - `visible: true` drops nodes the page hides (a closed drawer) before the
   exactly-one rule. Visibility is what renders, as `toBeVisible()` reads it:
   an `aria-hidden` spinner that paints is visible, so `toBeHidden()` waits

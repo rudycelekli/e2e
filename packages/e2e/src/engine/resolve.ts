@@ -78,8 +78,11 @@ function resolve(
 ): SemanticNode[] {
   switch (expression.kind) {
     case 'union': {
-      const matches = new Set([...resolve(expression.left, candidates, tree, options), ...resolve(expression.right, candidates, tree, options)]);
-      return candidates.filter(node => matches.has(node));
+      const matches = new Set([
+        ...resolve(expression.left, candidates, tree, options),
+        ...resolve(expression.right, candidates, tree, options),
+      ]);
+      return candidates.filter((node) => matches.has(node));
     }
     case 'query': {
       const pool =

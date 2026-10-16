@@ -131,11 +131,16 @@ descendants, unlike a query text, which matches exactly; pass a RegExp for
 anything stricter. `has` keeps a match whose subtree resolves the inner
 locator.
 
+`or(other)` matches either locator, in document order, a node both match
+once. It stays strict: when the two match different nodes, an action fails
+with `LOCATOR_AMBIGUOUS`, so add `first()` if either will do. On the web,
+both must be in the same frame.
+
 Throws `INVALID_LOCATOR` when `filter` gets neither `hasText` nor `has`, when
 it gets any other key, even beside them (`hasNot`, `hasNotText`, and
-`visible` are not filters here), when `has` is not a runner locator or was
-made by another target's screen, or when `nth` gets a negative or
-non-integer index.
+`visible` are not filters here), when `has` or the `or` argument is not a
+runner locator or was made by another target's screen, or when `nth` gets a
+negative or non-integer index.
 
 ```ts
 const row = screen.getByRole('listitem').filter({ hasText: 'Invoice 42' });
@@ -443,13 +448,6 @@ await screen.getByTestId('spinner').waitFor({ state: 'hidden' });
 ```
 
 ### Every match at once
-
-`locator.or(other)` matches either locator in traversal order and includes an
-overlapping node once. Both locators must belong to the same attempt and
-target. Actions and single-node assertions retain strict ambiguity when both
-branches match different nodes; use `.first()` only when that choice is intended.
-The web engine requires both branches in the same document and retains its
-existing restriction on display-value queries in native locator compositions.
 
 `all()` resolves the query once and hands back one `nth(i)` locator per
 match, so a loop can act on each row; `allTextContents()` reads every match's

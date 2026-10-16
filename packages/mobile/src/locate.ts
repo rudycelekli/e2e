@@ -18,8 +18,11 @@ export function resolveExpression(
 ): ProjectedNode[] {
   switch (expression.kind) {
     case 'union': {
-      const matches = new Set([...resolveExpression(expression.left, index), ...resolveExpression(expression.right, index)]);
-      return index.filter(entry => matches.has(entry));
+      const matches = new Set([
+        ...resolveExpression(expression.left, index, platform),
+        ...resolveExpression(expression.right, index, platform),
+      ]);
+      return index.filter((entry) => matches.has(entry));
     }
     case 'query': {
       const candidates =

@@ -98,6 +98,17 @@ describe('an exact label query composed as a has filter', () => {
     expect(await testIds(rowsWith(byLabel('Name', false, true)))).toEqual(['row-last-name', 'row-name']);
   });
 
+  it('unions two queries in document order, counting an overlapping row once', async () => {
+    const testId = (value: string): LocatorExpression => ({
+      kind: 'query',
+      query: { kind: 'testId', value: { kind: 'string', value, exact: true } },
+    });
+    const union: LocatorExpression = { kind: 'union', left: testId('row-quoted'), right: testId('row-last-name') };
+    expect(await testIds(union)).toEqual(['row-last-name', 'row-quoted']);
+    expect(await testIds({ kind: 'union', left: testId('row-quoted'), right: testId('row-quoted') })).toEqual(['row-quoted']);
+    expect(await testIds({ kind: 'index', source: union, index: 'first' })).toEqual(['row-last-name']);
+  });
+
   it('composes onto a position and a child query, and acts on the row it picked', async () => {
     const remove = removeButtonOf({ kind: 'index', source: rowsWith(byLabel('Name', true)), index: 'first' });
     const [button] = await locate(remove);
@@ -106,23 +117,4 @@ describe('an exact label query composed as a has filter', () => {
     expect(await testIds(rows)).toEqual(['row-last-name', 'row-quoted', 'row-name-hidden']);
     expect(await testIds(byLabel('Last Name', true))).toHaveLength(1);
   });
-});
-
-
-it('combines native queries without duplicate nodes and keeps document order', async () => {
- const engine=web(); const app=await startFixtureApp();
- const artifacts=mkdtempSync(path.join(tmpdir(),'e2e-union-')); const op=operation('union');
- await boot(engine,app);
- await engine.startAttempt!({attemptId:'union',artifactsDir:artifacts,signal:new AbortController().signal,resolveSecret:noSecrets,...ignoreTrace});
- try {
-  await engine.session!.open!(`${app.url}/rows`,op);
-  const last={kind:'query',query:{kind:'testId',value:{kind:'string',value:'row-last-name',exact:true}}} as const;
-  const quote={kind:'query',query:{kind:'testId',value:{kind:'string',value:'row-quoted',exact:true}}} as const;
-  const union={kind:'union',left:quote,right:last} as const;
-  expect((await engine.locate!(union,op)).map(n=>n.testId)).toEqual(['row-last-name','row-quoted']);
-  expect(await engine.locate!({kind:'union',left:last,right:last},op)).toHaveLength(1);
-  expect((await engine.locate!({kind:'index',source:union,index:'first'},op)).map(n=>n.testId)).toEqual(['row-last-name']);
- } finally {
-  await engine.endAttempt!(cleanup()); await engine.dispose!(cleanup()); await app.close(); rmSync(artifacts,{recursive:true,force:true});
- }
 });

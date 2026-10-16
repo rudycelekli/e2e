@@ -178,7 +178,8 @@ substring; a `RegExp` matches as written.
 - Narrow with `filter({ hasText })` (a case-insensitive substring, unlike a
   query), `filter({ has: locator })`, `first()`, `last()`, `nth(i)`, or
   scoping under another locator. Any other `filter` key (`hasNot`,
-  `hasNotText`) or an empty `filter({})` is `INVALID_LOCATOR`.
+  `hasNotText`) or an empty `filter({})` is `INVALID_LOCATOR`. `a.or(b)`
+  matches either, still strict: add `first()` when both may match.
 - `visible: true` drops nodes the page hides (a closed drawer) before the
   exactly-one rule. Visibility is what renders, as `toBeVisible()` reads it:
   an `aria-hidden` spinner that paints is visible, so `toBeHidden()` waits
@@ -449,5 +450,3 @@ A `route`, `unroute`, or `waitForResponse` pattern is a glob string or
 - No sleeps or polling loops; a matcher with a longer `timeout` instead.
 - `await` every step call and `expect.poll`, else `STEP_NOT_AWAITED` at the line of the call.
 - Assert the fact a model produced with `toContain`, not its exact sentence.
-
-Combine alternative locators with `first.or(second)`. Matches keep traversal order and overlapping nodes count once. Both locators must belong to the same target and attempt. Multiple distinct matches remain ambiguous for an action. Web branches must share a document; display-value compositions retain the documented engine limitation.

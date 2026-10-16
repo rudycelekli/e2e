@@ -250,6 +250,11 @@ function positioned(locator: PwLocator, index: 'first' | 'last' | number): PwLoc
   return index === 'first' ? locator.first() : index === 'last' ? locator.last() : locator.nth(index);
 }
 
+/** A projection whose matches are exactly `locator`'s, with nothing left for the surface to apply. */
+function plain(locator: PwLocator): ProjectedLocator {
+  return { locator, displayValue: null, name: null, composable: null, steps: [], visible: false };
+}
+
 const DISPLAY_VALUE_COMPOSITION_MESSAGE =
   'displayValue queries cannot scope child queries or serve as a has-filter in this engine';
 
@@ -279,10 +284,9 @@ const DISPLAY_VALUE_COMPOSITION_MESSAGE =
 function project(scope: PwScope, expression: LocatorExpression, testIdAttribute: string): ProjectedLocator {
   switch (expression.kind) {
     case 'union': {
-      frameSelectors(expression);
       const left = requireComposable(project(scope, expression.left, testIdAttribute));
       const right = requireComposable(project(scope, expression.right, testIdAttribute));
-      return { locator: left.or(right), displayValue: null, name: null, composable: null, steps: [], visible: false };
+      return plain(left.or(right));
     }
     case 'query': {
       const inner =
@@ -327,24 +331,10 @@ function project(scope: PwScope, expression: LocatorExpression, testIdAttribute:
           steps: [...source.steps, { kind: 'index', index: expression.index }],
         };
       }
-      return {
-        locator: positioned(source.locator, expression.index),
-        displayValue: null,
-        name: null,
-        composable: null,
-        steps: [],
-        visible: false,
-      };
+      return plain(positioned(source.locator, expression.index));
     }
     case 'selector':
-      return {
-        locator: scope.locator(expression.selector),
-        displayValue: null,
-        name: null,
-        composable: null,
-        steps: [],
-        visible: false,
-      };
+      return plain(scope.locator(expression.selector));
     case 'frame':
       return project(scope.frameLocator(expression.selector), expression.source, testIdAttribute);
   }
@@ -411,7 +401,9 @@ export function frameSelectors(expression: LocatorExpression): string[] {
       const left = frameSelectors(expression.left);
       const right = frameSelectors(expression.right);
       if (left.length !== right.length || left.some((selector, index) => selector !== right[index])) {
-        throw new EngineError('UNSUPPORTED_CAPABILITY', 'locator.or requires both branches in the same document', { retryable: false });
+        throw new EngineError('UNSUPPORTED_CAPABILITY', 'locator.or requires both branches in the same document', {
+          retryable: false,
+        });
       }
       return left;
     }
