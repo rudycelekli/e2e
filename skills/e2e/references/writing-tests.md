@@ -179,7 +179,10 @@ substring; a `RegExp` matches as written.
   query), `filter({ has: locator })`, `first()`, `last()`, `nth(i)`, or
   scoping under another locator. Any other `filter` key (`hasNot`,
   `hasNotText`) or an empty `filter({})` is `INVALID_LOCATOR`. `a.or(b)`
-  matches either, still strict: add `first()` when both may match.
+  matches either, still strict: add `first()` when both may match. Both
+  locators must come from the same screen and attempt. Web branches need
+  identical literal frame-selector chains; display-value branches cannot
+  be composed.
 - `visible: true` drops nodes the page hides (a closed drawer) before the
   exactly-one rule. Visibility is what renders, as `toBeVisible()` reads it:
   an `aria-hidden` spinner that paints is visible, so `toBeHidden()` waits
@@ -412,7 +415,8 @@ the app opens itself (`target="_blank"`, `window.open`) is not followed:
 - `waitForResponse(pattern, { timeout? })`: resolves once the headers
   arrive, with `{ url, status, headers, json(), text() }`; `text()` and
   `json()` wait for the body (up to the action timeout) and reject with
-  `ACTION_FAILED` when it could not be read.
+  `ACTION_FAILED` when it could not be read. Start the wait before the
+  request, including the first `browser.goto` or `app.open`.
 - `cookies()`, `setCookies([...])`: a target is an http(s) URL or a domain.
 - `setViewport({ width, height })`: resize.
 - `emulateMedia({ colorScheme?, reducedMotion? })`: what the page's `@media`
