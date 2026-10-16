@@ -18,9 +18,7 @@ import type { EventEmitter } from 'node:events';
 import type { Download, Page } from 'playwright-core';
 import { TestError, type EngineFixtureContext } from 'e2e/engine';
 import { PlaywrightSurface } from '../../src/surface.ts';
-import type { Browser, WebRoute } from '../../src/browser.ts';
-const browserModule = '../../dist/browser.js';
-const { createBrowserFixture } = await import(browserModule) as typeof import('../../src/browser.ts');
+import { createBrowserFixture, type Browser, type WebRoute } from '../../src/browser.ts';
 import { ignoreTrace, noSecrets } from '../helpers/secrets.ts';
 
 interface Echo {
@@ -161,20 +159,31 @@ describe('browser.route decisions', () => {
     expect((page as unknown as EventEmitter).listenerCount('download')).toBe(listeners);
   });
 
-  it('bounds saving a real download whose HTTP body never finishes', async () => {
-    await page.evaluate(() => { const link=document.createElement('a');link.href='/stream-download';link.textContent='Stream';document.body.append(link); });
+  it.each(['waitForDownload', 'waitForDownloads'] as const)('%s bounds saving a download whose HTTP body never finishes', async (method) => {
+    await page.evaluate(() => {
+      const link = document.createElement('a');
+      link.href = '/stream-download';
+      link.textContent = 'Stream';
+      document.body.append(link);
+    });
     const baseline = (page as unknown as EventEmitter).listenerCount('download');
     let download: Download | undefined;
-    page.once('download', value => { download=value; });
-    const work = browser.waitForDownloads(() => page.evaluate(() => document.querySelector<HTMLAnchorElement>('a')!.click()), {count:1, timeout:500});
+    page.once('download', (value) => { download = value; });
+    const trigger = () => page.evaluate(() => document.querySelector<HTMLAnchorElement>('a')!.click());
+    const work = method === 'waitForDownload'
+      ? browser.waitForDownload(trigger, { timeout: 500 })
+      : browser.waitForDownloads(trigger, { count: 1, timeout: 500 });
     let timer: ReturnType<typeof setTimeout> | undefined;
     try {
-      const result = await Promise.race([work.then(() => 'completed', cause => cause), new Promise(resolve => { timer=setTimeout(() => resolve('still pending'), 1500); })]);
+      const result = await Promise.race([
+        work.then(() => 'completed', (cause: unknown) => cause),
+        new Promise((resolve) => { timer = setTimeout(() => resolve('still pending'), 1500); }),
+      ]);
       expect(download).toBeDefined();
-      expect(result).toMatchObject({code:'ACTION_FAILED',message:expect.stringContaining('did not finish')});
+      expect(result).toMatchObject({ code: 'ACTION_FAILED', message: expect.stringContaining('did not finish') });
       expect((page as unknown as EventEmitter).listenerCount('download')).toBe(baseline);
     } finally {
-      if(timer!==undefined) clearTimeout(timer);
+      clearTimeout(timer);
       server.closeAllConnections();
       await download?.cancel();
       await work.catch(() => undefined);
@@ -186,7 +195,6 @@ describe('browser.route decisions', () => {
     const failure = new TestError('ASSERTION_FAILED', 'trigger assertion');
     await expect(browser.waitForDownloads(async () => { throw failure; }, { count: 2, timeout: 30 })).rejects.toBe(failure);
     expect((page as unknown as EventEmitter).listenerCount('download')).toBe(listeners);
-    await new Promise(resolve => setTimeout(resolve, 50));
   });
 
   it('answers with the route registered last when two fulfill', async () => {

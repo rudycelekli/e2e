@@ -13,9 +13,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeAll, afterAll, describe, expect, it } from 'vitest';
 import type { EngineFixtureContext, EngineHandle, OperationContext } from 'e2e/engine';
-import type { BrowserProvider, BrowserProviderScope, Browser } from '../../src/index.ts';
-const builtWeb = '../../dist/index.js';
-const { web: webEngine, surfaceOf } = await import(builtWeb) as typeof import('../../src/index.ts');
+import { web as webEngine, surfaceOf, type BrowserProvider, type BrowserProviderScope, type Browser } from '../../src/index.ts';
 import { closeRemoteChrome, launchRemoteChrome, type RemoteChrome } from '../helpers/cdp-host.ts';
 import { startFixtureApp, type FixtureApp } from '../helpers/fixture-app.ts';
 import { ignoreTrace, noSecrets } from '../helpers/secrets.ts';
@@ -113,14 +111,10 @@ describe.each<BrowserProviderScope>(['worker', 'attempt'])('downloads through a 
     expect(files).toHaveLength(count);
     for (const [index, file] of files.entries()) {
       expect(file.suggestedFilename).toBe(`report-${index}.txt`);
-      if (count > 1) expect(file).toHaveProperty('absolutePath', expect.any(String));
-      if ('absolutePath' in file && typeof file.absolutePath === 'string') {
-        expect(path.isAbsolute(file.absolutePath)).toBe(true);
-        expect(file.absolutePath).toBe(path.join(artifactsDir, file.path));
-        expect(readFileSync(file.absolutePath, 'utf8')).toBe(`report body ${index}`);
-      }
+      expect(path.isAbsolute(file.absolutePath)).toBe(true);
+      expect(file.absolutePath).toBe(path.join(artifactsDir, file.path));
+      expect(readFileSync(file.absolutePath, 'utf8')).toBe(`report body ${index}`);
       expect(file.path).toMatch(/^downloads\/\d{3}-report-\d\.txt$/);
-      expect(readFileSync(path.join(artifactsDir, file.path), 'utf8')).toBe(`report body ${index}`);
     }
     expect(attached).toEqual(files.map(file => file.path));
     expect(reads).toHaveLength(count);
@@ -129,7 +123,7 @@ describe.each<BrowserProviderScope>(['worker', 'attempt'])('downloads through a 
     expect(readdirSync(path.join(remoteDisk, 'downloads')).toSorted()).toEqual(reads.map(read => path.basename(read.file)).toSorted());
   });
 
-  it('bounds an actual completed download whose provider read is stalled', async () => {
+  it.each(['waitForDownload', 'waitForDownloads'] as const)('%s bounds a completed download whose provider read stalls', async (method) => {
     artifactsDir = mkdtempSync(path.join(tmpdir(), 'e2e-provider-stalled-'));
     remoteDisk = mkdtempSync(path.join(tmpdir(), 'e2e-browser-stalled-'));
     chrome = await launchRemoteChrome();
@@ -159,7 +153,10 @@ describe.each<BrowserProviderScope>(['worker', 'attempt'])('downloads through a 
     await page.evaluate(() => {
       const link = document.createElement('a');
       link.href = URL.createObjectURL(new Blob(['stalled provider body']));
-      link.download = 'report.txt';link.id = 'download';link.textContent = 'Download';document.body.append(link);
+      link.download = 'report.txt';
+      link.id = 'download';
+      link.textContent = 'Download';
+      document.body.append(link);
     });
     const attached: string[] = [];
     const browser = engine.fixtures!['browser']!({
@@ -168,7 +165,10 @@ describe.each<BrowserProviderScope>(['worker', 'attempt'])('downloads through a 
       expectable: (target: object) => target, fixture: (_name: string, target: object) => target,
       attachArtifact: (_kind: string, relative: string) => attached.push(relative),
     } as unknown as EngineFixtureContext) as Browser;
-    const work = browser.waitForDownloads(() => page.locator('#download').click(), { count: 1, timeout: 500 });
+    const trigger = () => page.locator('#download').click();
+    const work = method === 'waitForDownload'
+      ? browser.waitForDownload(trigger, { timeout: 500 })
+      : browser.waitForDownloads(trigger, { count: 1, timeout: 500 });
     let watchdog: ReturnType<typeof setTimeout> | undefined;
     try {
       const result = await Promise.race([
@@ -181,5 +181,4 @@ describe.each<BrowserProviderScope>(['worker', 'attempt'])('downloads through a 
       expect(attached).toEqual([]);
     } finally { clearTimeout(watchdog); }
   });
-
 });
