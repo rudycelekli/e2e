@@ -16,6 +16,7 @@ import type { Browser, RouteContinueOverrides, RouteFulfillResponse, WebRoute } 
 ({ headers: { 'x-n': 1 } }) satisfies RouteContinueOverrides;
 
 declare const browser: Browser;
+void (browser.waitForDownload(async () => {}).then(file => file.absolutePath) satisfies Promise<string>);
 void (browser.unrouteAll() satisfies Promise<void>);
 // @ts-expect-error clearing routes takes no options
 void browser.unrouteAll({ behavior: 'ignoreErrors' });

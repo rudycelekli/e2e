@@ -2,6 +2,8 @@
 title: Subscriptions
 description: Use your ChatGPT, GitHub Copilot, OpenCode Console, or SuperGrok subscription, or your Claude Max or Team plan's API credits, for agent steps.
 icon: "id-card"
+"og:image": "https://e2e.tester.army/docs/images/og/subscriptions.png?v=174d49a0e9"
+"twitter:image": "https://e2e.tester.army/docs/images/og/subscriptions.png?v=174d49a0e9"
 ---
 
 Run agent steps on a plan you already pay for. Sign in one time, then use
@@ -69,6 +71,8 @@ import { copilot } from 'e2e/oauth/copilot';
 
 const agent = { model: copilot('claude-sonnet-5') };
 ```
+
+Which models your plan serves is up to GitHub; see [Pick a model](#pick-a-model).
   </Tab>
   <Tab title="OpenCode Console">
 <CodeGroup>
@@ -96,6 +100,10 @@ const agent = { model: opencodeConsole('deepseek-v4.1-flash') };
 // OpenCode Go, billed to your Go subscription
 const goAgent = { model: opencodeConsole('go/deepseek-v4.1-flash') };
 ```
+
+On the Anthropic route, a call that sets no `maxOutputTokens` asks for 8192: the
+Anthropic SDK does not know the ids OpenCode serves there, and on its own it
+limits the request to 4096 tokens and only warns.
   </Tab>
   <Tab title="SuperGrok">
 <CodeGroup>
@@ -182,9 +190,17 @@ bunx e2e models openai     # one provider
 
 The id is not always the name the vendor's app shows.
 
-- **Copilot** marks the models `copilot()` can't call. For `not enabled`,
-  turn the model on in your Copilot settings on GitHub, or ask the admin who
-  manages your seat. For `no chat or responses`, use a different model.
+With `OPENCODE_API_KEY` set, `e2e models opencode-console` lists the ids that
+key serves, the same key `opencodeConsole()` uses in place of the login.
+
+- **Copilot** marks `not enabled` (turn the model on in your Copilot
+  settings on GitHub, or ask the admin who manages your seat) and `no chat
+  or responses` (use a different model). It can't see what your plan
+  serves: on Copilot Free, GitHub serves models through
+  [auto model selection only](https://docs.github.com/en/copilot/get-started/plans),
+  so a model called by id is usually refused. The run then stops with
+  `MODEL_UNAVAILABLE` naming it; pick another id or an
+  [API provider](/models).
 - **OpenCode Console** lists `go/` models only if you have Go. It leaves out
   models your workspace turned off, and Zen's free models. Key
   `providerOptions` by `opencode` for chat completions models, else by
@@ -207,12 +223,14 @@ working, the step fails with `MODEL_PROVIDER_FAILED`, and the message gives
 the `npx e2e login <provider>` command to run. See the
 [CLI reference](/reference/cli#e2e-login) for every flag.
 
+Model-call cancellation also applies while waiting for a token refresh.
+
 ## CI
 
 Use API keys in CI. Claude Max or Team already uses one. For OpenCode
-Console, create a service account API key in the Console (Service Accounts,
-then API Keys) and set it as `OPENCODE_API_KEY`. For ChatGPT, Copilot, and
-SuperGrok, use an [API provider](/models).
+Console, set `OPENCODE_API_KEY` to an OpenCode Go subscription API key, or to
+a service account API key created in the Console (Service Accounts, then API
+Keys). For ChatGPT, Copilot, and SuperGrok, use an [API provider](/models).
 
 [`E2E_OAUTH_CREDENTIALS`](/reference/environment) can give a stored login to
 CI, but e2e doesn't save refreshed tokens back to it. A login with a
