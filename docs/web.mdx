@@ -54,13 +54,14 @@ export default {
 
 The command runs without a shell: `executable` comes from `PATH` and `args`
 pass as written. The child gets only `PATH`, `HOME`, the temp-directory
-variables, and `env`.
+variables, `inheritEnv`, and `env`.
 
 | Option | Purpose |
 | --- | --- |
 | `reuseExisting: true` | Use a server that already runs. In CI, e2e ignores it, and a server that already answers is `APP_ALREADY_RUNNING`. |
-| `log` | Save the app's stdout and stderr to a project-relative file. A startup error quotes the last 20 lines any process appended to the file since the command started, with `command.env` values redacted. The file itself is not redacted. |
+| `log` | Save the app's stdout and stderr to a project-relative file. A startup error quotes the last 20 lines any process appended to the file since the command started, with `command.env` and `inheritEnv` values redacted. The file itself is not redacted. |
 | `env` | Environment variables for the app. |
+| `inheritEnv` | Host variables to pass through when set, by name or prefix: `['DATABASE_URL', 'STRIPE_*']`. `env` wins over them. |
 | `startupTimeout` | How long to wait for the app to answer. Default 60 seconds. |
 | `readyUrl` | Set beside `command`, not in it, to probe a health endpoint instead of `app.url`. |
 
@@ -275,8 +276,9 @@ and run it with `--config`.
 
 A narrow viewport tests responsive layout only. The browser is still a
 desktop browser: scale factor 1, desktop pointer, and its usual user agent.
-It doesn't emulate touch, color scheme, or reduced motion. To test on a
-simulator or emulator, use the [mobile engine](/mobile).
+It doesn't emulate touch. To test on a simulator or emulator, use the
+[mobile engine](/mobile). For dark mode and reduced motion, see
+[Emulate dark mode and reduced motion](/browser#emulate-dark-mode-and-reduced-motion).
 
 A video keeps the size the page had when recording started. Set
 `web({ screencast: { size } })` for one fixed size. A browser provider that
