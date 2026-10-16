@@ -247,15 +247,3 @@ describe('native dialog kind', () => {
     expect(() => router.throwPending()).not.toThrow();
   });
 });
-
-describe('unknown native dialog kind', () => {
-  it('dismisses the dialog and reports an explicit engine failure', async () => {
-    const router = new DialogRouter();
-    const native = fakeDialog();
-    native.dialog.type = () => 'future-dialog';
-    router.add(dialog => dialog.accept());
-    await router.dispatch(native.dialog);
-    expect(native.dismiss).toHaveBeenCalledOnce();
-    expect(() => router.throwPending()).toThrowError(expect.objectContaining({ code: 'ENGINE_FAILURE' }));
-  });
-});

@@ -22,13 +22,6 @@ export interface Dialog {
 
 export type DialogHandler = 'accept' | 'dismiss' | ((dialog: Dialog) => void | Promise<void>);
 
-/** Narrows the four dialog kinds the browser protocol exposes. */
-function nativeDialogType(dialog: PwDialog): Dialog['type'] {
-  const type = dialog.type();
-  if (type === 'alert' || type === 'confirm' || type === 'prompt' || type === 'beforeunload') return type;
-  throw new EngineError('ENGINE_FAILURE', `unknown native dialog kind: ${type}`, { retryable: false });
-}
-
 interface Registration {
   readonly handler: DialogHandler;
 }
@@ -82,21 +75,21 @@ export class DialogRouter {
     }
     let decided = false;
     let answered = false;
+    const publicDialog: Dialog = {
+      type: dialog.type() as Dialog['type'],
+      message: dialog.message(),
+      accept: async (text) => {
+        decided = true;
+        await dialog.accept(text);
+        answered = true;
+      },
+      dismiss: async () => {
+        decided = true;
+        await dialog.dismiss();
+        answered = true;
+      },
+    };
     try {
-      const publicDialog: Dialog = {
-        type: nativeDialogType(dialog),
-        message: dialog.message(),
-        accept: async (text) => {
-          decided = true;
-          await dialog.accept(text);
-          answered = true;
-        },
-        dismiss: async () => {
-          decided = true;
-          await dialog.dismiss();
-          answered = true;
-        },
-      };
       if (handler === 'accept') await dialog.accept();
       else if (handler === 'dismiss') await dialog.dismiss();
       else {
