@@ -111,10 +111,7 @@ pnpm bench:ab -- tests-agent/control-inventory.e2e.ts --config e2e.agent.config.
 ```
 
 It prints a markdown table to paste into the PR, and lists first any test
-whose behavior changed. Its counter comparison reports run exit-code differences
-or instability, including those caused by a failed suite hook or reporter when
-test attempts match. Stable equal exit codes are omitted from changed counters.
-`AGENTS.md` describes the output.
+whose behavior changed. `AGENTS.md` describes the output.
 
 ### Commit message convention
 

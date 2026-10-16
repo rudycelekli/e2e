@@ -148,7 +148,6 @@ describe('compareSamples', () => {
   });
 });
 
-
 describe('run outcomes', () => {
   it('reports a failed run even when all test attempts match the passing baseline', () => {
     const document = report({ one: [{ api: 'agent.act', durationMs: 100 }] });
