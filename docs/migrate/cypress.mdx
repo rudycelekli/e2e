@@ -2,6 +2,8 @@
 title: From Cypress
 description: Replace Cypress command chains with async tests and keep your data-cy attributes.
 icon: "/images/icons/cypress.svg"
+"og:image": "https://e2e.tester.army/docs/images/og/migrate/cypress.png?v=e4e71f42dc"
+"twitter:image": "https://e2e.tester.army/docs/images/og/migrate/cypress.png?v=e4e71f42dc"
 ---
 
 import { SetupPrompt } from '../snippets/setup-prompt-card.jsx';
@@ -28,6 +30,8 @@ Node. Both suites can stay in the project while you move one spec at a time.
 <Prompt description={migrationPrompt} children={migrationPrompt} actions={["copy", "cursor"]} />
 
 </SetupPrompt>
+
+For a migration that spans several sessions, the [`migrate-to-e2e` skill](/coding-agents#migrate-an-existing-suite) records what moved in a progress file and keeps the old suite running until you retire each test.
 
 ## Port the config
 
@@ -83,8 +87,9 @@ import { expect } from 'e2e';
 describe('todos', () => {
   test('completes one', async ({ app, agent, screen }) => {
     await app.open('/todos');
-    await agent.act('add todos "Buy milk" and "Walk the dog", then complete "Buy milk"');
+    await agent.act('add todos "Buy milk" and "Walk the dog"');
     await expect(screen.getByTestId('todo')).toHaveCount(2);
+    await agent.act('complete "Buy milk"');
     await expect(screen.getByText('1 item left')).toBeVisible();
   });
 });
