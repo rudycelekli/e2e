@@ -1,7 +1,7 @@
 ---
-"e2e": minor
-"@e2e-dev/web": minor
-"@e2e-dev/mobile": minor
+"e2e": patch
+"@e2e-dev/web": patch
+"@e2e-dev/mobile": patch
 ---
 
-Support hasNotText locator filters with string and RegExp matching across the SDK, browser engine, and device engine.
+`locator.filter()` takes `hasNotText`, which drops matches whose text contains a string or matches a RegExp, as in Playwright. Third-party engines must handle the new `hasNotText` field of a `filter` expression.

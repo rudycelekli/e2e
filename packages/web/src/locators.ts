@@ -261,13 +261,13 @@ const DISPLAY_VALUE_COMPOSITION_MESSAGE =
  * it (see `Candidates`), so a scope, a `has` filter, and an index reach
  * across a closed boundary. Two compositions stay Playwright's own and stop
  * at one: a `selector` expression is the platform's CSS or XPath, and
- * `filter({ hasText })` reads an element's text as Playwright does, light DOM
- * and open roots, so text inside a closed root does not count toward an
- * element outside it.
+ * `filter({ hasText, hasNotText })` reads an element's text as Playwright
+ * does, light DOM and open roots, so text inside a closed root does not count
+ * toward an element outside it.
  *
  * A display-value query resolves to a candidate locator plus a value predicate
  * the surface applies once the candidates are read. Per-element filters
- * (`filter({ hasText, has })`) commute with that predicate, so they compose
+ * (`filter({ hasText, hasNotText, has })`) commute with that predicate, so they compose
  * onto the candidate locator as for any other query. Positional selection does
  * not commute (positions are relative to the value-filtered matches), so it is
  * recorded as a step and applied after filtering; a filter that follows a

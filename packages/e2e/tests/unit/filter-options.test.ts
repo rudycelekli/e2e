@@ -1,8 +1,8 @@
 /**
- * `locator.filter(options)` takes `hasText`, `hasNotText` and `has`. A key
- * it does not implement (`hasNot`, `visible`) must fail the
- * call, alone or beside a supported one, rather than be dropped: dropping an
- * exclusion widens the match and the action lands on the wrong row.
+ * `locator.filter(options)` takes `hasText`, `hasNotText`, and `has` and
+ * nothing else. A key it does not implement (`hasNot`, `visible`) must fail
+ * the call, alone or beside a supported one, rather than be dropped: dropping
+ * an exclusion widens the match and the action lands on the wrong row.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -38,6 +38,16 @@ describe('locator.filter options', () => {
     const rows = screen.getByRole('row').filter({ hasText: 'Invoice' });
     expect(await rows.allTextContents()).toEqual(['Invoice 41 Paid', 'Invoice 42 Due']);
     expect(await screen.getByRole('row').filter({ hasText: 'Due' }).textContent()).toBe('Invoice 42 Due');
+  });
+
+  it('excludes rows by hasNotText, alone, beside hasText, and as a RegExp', async () => {
+    const { screen } = invoiceScreen();
+    const rows = screen.getByRole('row');
+    expect(await rows.filter({ hasNotText: 'paid' }).allTextContents()).toEqual(['Invoice 42 Due']);
+    expect(await rows.filter({ hasText: 'invoice', hasNotText: /paid$/i }).allTextContents()).toEqual(['Invoice 42 Due']);
+    expect(await rows.filter({ hasNotText: /Invoice/ }).count()).toBe(0);
+    expect(await rows.filter({ hasNotText: 'unrelated' }).count()).toBe(2);
+    expect(await rows.filter({ hasNotText: '' }).count()).toBe(0);
   });
 
   it.each<[string, (paid: Locator) => object, string]>([
@@ -89,13 +99,4 @@ describe('query options', () => {
     expect(() => query(screen)).toThrow(expect.objectContaining({ code: 'INVALID_LOCATOR', message }));
     expect(expressions).toEqual([]);
   });
-});
-
-it('excludes matching subtree text alone, composed with inclusion, and as a RegExp', async () => {
-  const { screen } = invoiceScreen();
-  expect(await screen.getByRole('row').filter({ hasNotText: 'paid' }).allTextContents()).toEqual(['Invoice 42 Due']);
-  expect(await screen.getByRole('row').filter({ hasText: 'invoice', hasNotText: /paid$/i }).allTextContents()).toEqual(['Invoice 42 Due']);
-  expect(await screen.getByRole('row').filter({ hasNotText: /Invoice/ }).count()).toBe(0);
-  expect(await screen.getByRole('row').filter({ hasNotText: 'unrelated' }).count()).toBe(2);
-  expect(await screen.getByRole('row').filter({ hasNotText: '' }).count()).toBe(0);
 });

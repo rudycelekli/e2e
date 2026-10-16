@@ -1,7 +1,7 @@
 /** Immutable locator expression construction. */
 
 import type { LocatorExpression, SemanticQuery } from '../engine/surface.ts';
-import { toTextPattern, type TextPattern } from '../internal/text.ts';
+import { describePattern, toTextPattern, type TextPattern } from '../internal/text.ts';
 import { TestError, type ErrorDetails } from '../internal/errors.ts';
 import type { Role, RoleAlias, RoleOptions, TextMatch, TextMatchOptions } from '../types.ts';
 
@@ -154,28 +154,16 @@ export function describeExpression(expression: LocatorExpression): string {
   switch (expression.kind) {
     case 'query': {
       const query = expression.query;
-      const value =
-        query.value.kind === 'string' ? JSON.stringify(query.value.value) : `/${query.value.source}/${query.value.flags}`;
-      const name =
-        query.name === undefined
-          ? ''
-          : `, name: ${query.name.kind === 'string' ? JSON.stringify(query.name.value) : `/${query.name.source}/${query.name.flags}`}`;
+      const value = describePattern(query.value);
+      const name = query.name === undefined ? '' : `, name: ${describePattern(query.name)}`;
       const visible = query.visible === true ? ', visible: true' : '';
       const scope = expression.scope === undefined ? '' : `${describeExpression(expression.scope)} >> `;
       return `${scope}getBy${query.kind[0]!.toUpperCase()}${query.kind.slice(1)}(${value}${name}${visible})`;
     }
     case 'filter': {
       const parts: string[] = [];
-      if (expression.hasText !== undefined) {
-        parts.push(
-          `hasText: ${expression.hasText.kind === 'string' ? JSON.stringify(expression.hasText.value) : `/${expression.hasText.source}/${expression.hasText.flags}`}`,
-        );
-      }
-      if (expression.hasNotText !== undefined) {
-        parts.push(
-          `hasNotText: ${expression.hasNotText.kind === 'string' ? JSON.stringify(expression.hasNotText.value) : `/${expression.hasNotText.source}/${expression.hasNotText.flags}`}`,
-        );
-      }
+      if (expression.hasText !== undefined) parts.push(`hasText: ${describePattern(expression.hasText)}`);
+      if (expression.hasNotText !== undefined) parts.push(`hasNotText: ${describePattern(expression.hasNotText)}`);
       if (expression.has !== undefined) parts.push(`has: ${describeExpression(expression.has)}`);
       return `${describeExpression(expression.source)}.filter({ ${parts.join(', ')} })`;
     }
