@@ -303,6 +303,16 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
   const latch = surface.latch;
   const routes: StoredRoute[] = [];
 
+  /** Unregisters the stored routes `match` selects, newest first. */
+  const removeRoutes = async (match: (stored: StoredRoute) => boolean): Promise<void> => {
+    for (let i = routes.length - 1; i >= 0; i -= 1) {
+      const stored = routes[i]!;
+      if (!match(stored)) continue;
+      await surface.unroute(stored.predicate, stored.pwHandler);
+      routes.splice(i, 1);
+    }
+  };
+
   /**
    * Relative URLs and URL matching need the configured base. Resolving the
    * empty reference yields the base itself, and lets the harness raise
@@ -483,25 +493,11 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
     },
     unroute(pattern) {
       const wirePattern = toTextPattern(pattern);
-      return surface.guard(context.operation(), 'unroute', async () => {
-        for (let i = routes.length - 1; i >= 0; i -= 1) {
-          const stored = routes[i]!;
-          if (routePatternsEqual(stored.pattern, wirePattern)) {
-            await surface.unroute(stored.predicate, stored.pwHandler);
-            routes.splice(i, 1);
-          }
-        }
-      });
+      return surface.guard(context.operation(), 'unroute', () =>
+        removeRoutes(stored => routePatternsEqual(stored.pattern, wirePattern)));
     },
-    unrouteAll(...args: unknown[]) {
-      requireNoArguments('browser.unrouteAll', args);
-      return surface.guard(context.operation(), 'unrouteAll', async () => {
-        for (let i = routes.length - 1; i >= 0; i -= 1) {
-          const stored = routes[i]!;
-          await surface.unroute(stored.predicate, stored.pwHandler);
-          routes.splice(i, 1);
-        }
-      });
+    unrouteAll() {
+      return surface.guard(context.operation(), 'unrouteAll', () => removeRoutes(() => true));
     },
     waitForResponse(pattern, options) {
       const wirePattern = toTextPattern(pattern);
