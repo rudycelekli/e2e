@@ -738,6 +738,15 @@ test('never runs either', async () => { throw new Error('three'); });
       expect(invalid.report.run.errors.map((error) => [error.code, error.message])).toEqual([
         ['INVALID_CONFIG', 'maxFailures must be a positive safe integer, got 0'],
       ]);
+      for (const [shard, message] of [
+        [{ index: 1.5, total: 2 }, 'shard.index must be an integer from 1 through 2'],
+        [{ index: 3, total: 2 }, 'shard.index must be an integer from 1 through 2'],
+        [{ index: 1, total: 0 }, 'shard.total must be a positive safe integer, got 0'],
+      ] as const) {
+        const badShard = await runExisting(project, { runOptions: { shard } });
+        expect(badShard.exitCode).toBe(2);
+        expect(badShard.report.run.errors.map((error) => [error.code, error.message])).toEqual([['INVALID_CONFIG', message]]);
+      }
       project.cleanup();
     },
     120_000,

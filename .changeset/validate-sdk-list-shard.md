@@ -2,4 +2,4 @@
 "e2e": patch
 ---
 
-Reject invalid in-process list shards as INVALID_CONFIG, matching the CLI bounds for positive safe integers and index within total.
+Reject an invalid `shard` passed to `run()` or `list()` with `INVALID_CONFIG`, as the `--shard` flag does.

@@ -61,7 +61,7 @@ import { setSecretRegistry } from '../secrets.ts';
 import { withAbort } from '../internal/time.ts';
 import type { BuiltinReporter, E2EConfig, FinishedRun, RecordingMode, Reporter, ReporterSummary } from '../types.ts';
 import { modelLabel } from '../config/agent.ts';
-import { positiveInt, timerMs } from '../config/validate.ts';
+import { boundedInt, describeValue, positiveInt, timerMs } from '../config/validate.ts';
 import { detectVcs, type VcsInfo } from '../internal/vcs.ts';
 import type { EnginePrepareResult } from '../engine/index.ts';
 import type { AppProcesses } from './managed-process.ts';
@@ -1186,22 +1186,22 @@ async function selectionInputs(options: SelectionRunOptions, config: ResolvedCon
   return { filters, lastRun };
 }
 
-/** The CLI's scalar selection bounds, also checked for the in-process SDK path. */
+/**
+ * The run options the CLI parser already bounds, checked again for the SDK
+ * path so `run({ maxFailures: 0 })` or `run({ repeatEach: 0 })` is
+ * `INVALID_CONFIG` rather than a run that stops at its first failure or
+ * runs each test once.
+ */
 function validateRunOptions(options: SelectionRunOptions): void {
   positiveInt(options.maxFailures, 'maxFailures');
   timerMs(options.maxDuration, 'maxDuration');
   positiveInt(options.repeatEach, 'repeatEach');
-  const shard = options.shard;
-  if (shard !== undefined && (
-    shard === null ||
-    !Number.isSafeInteger(shard.index) || shard.index <= 0 ||
-    !Number.isSafeInteger(shard.total) || shard.total <= 0 ||
-    shard.index > shard.total
-  )) {
-    throw new ConfigurationError(
-      'INVALID_CONFIG',
-      'shard must have positive safe integer index and total, with index from 1 through total',
-    );
+  if (options.shard !== undefined) {
+    if (typeof options.shard !== 'object' || options.shard === null) {
+      throw new ConfigurationError('INVALID_CONFIG', `shard must be { index, total }, got ${describeValue(options.shard)}`);
+    }
+    const total = positiveInt(options.shard.total, 'shard.total');
+    boundedInt(options.shard.index, 'shard.index', 1, total!);
   }
 }
 
