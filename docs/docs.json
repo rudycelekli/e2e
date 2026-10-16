@@ -134,7 +134,8 @@
               "index",
               "quickstart",
               "core-concepts",
-              "coding-agents"
+              "coding-agents",
+              "mcp"
             ]
           },
           {
@@ -180,9 +181,11 @@
             "pages": [
               "integrations/index",
               "integrations/kernel",
+              "integrations/lightpanda",
               "integrations/eas",
               "integrations/smol",
-              "integrations/limrun"
+              "integrations/limrun",
+              "integrations/testmu"
             ]
           },
           {

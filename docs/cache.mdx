@@ -62,7 +62,8 @@ a run leaves the cache unchanged.
 An attempt whose only failures are ones where no model answered evicts
 nothing, since these say nothing about the app:
 
-- `MODEL_UNAVAILABLE`: no model is configured.
+- `MODEL_UNAVAILABLE`: no model is configured, or GitHub Copilot doesn't
+  serve it to the account.
 - `MODEL_PROVIDER_FAILED`: the provider returned an error, such as a
   missing or rejected key, a rate limit, or a 5xx, or a request got no
   response within 120 seconds.
@@ -92,6 +93,10 @@ agent. Each of these changes causes a miss:
 
 Changing the model doesn't cause a miss, and neither does upgrading the
 engine: a node the new version resolves differently misses at replay.
+
+Use `--no-cache` to evaluate a new model. Replays expose
+`step.cache.recordedBy` when the entry has provenance; older or unattributed
+entries omit it.
 
 A timestamp or a fresh email address would miss on every run. Wrap such
 values in `unique()`, and the runner puts in the current value at replay:
@@ -152,7 +157,8 @@ page on any other origin is another route.
   already on screen before the actions proves nothing. When the step's last
   action moved to another route, that move is the evidence.
 - An alert that the replay raised and the recording never saw stops the
-  replay.
+  replay. The web engine does not observe Next.js App Router's route
+  announcer, so its title echo never counts.
 - Text that differs on every run, such as a date, a duration, or an id,
   is skipped while a stable change exists. With nothing else, it is kept,
   and a changed value hands the replay off. In an alert, it reads as a placeholder.
@@ -178,7 +184,10 @@ step. `agent.act()` returns it as `result.cache`, without `write`, and the
 | `missed` | `missed` | The agent ran the step from the beginning. |
 
 Both carry `step.cache.reason`, and `step.cache.detail` says where the
-replay stopped and why (`at action 2 of 3, tap button "Apply": ...`).
+replay stopped and why (`at action 2 of 3, tap button "Apply": ...`). After
+an `end-mismatch` it names the recorded nodes that did not show, the ones
+that did not go away, and any alert the recording never saw, or says the
+outcome already showed before the replay acted.
 `step.cache.entry` is the entry's key and its file name (`<entry>.json`) in
 the file store.
 
@@ -261,6 +270,28 @@ cache: { mode: 'read-write', dir: '.e2e/cache' },
 until a `read-write` run replaces them. A custom `cache.store` replaces the
 file store and doesn't default to `read-only` in CI. `e2e explore` and
 `e2e mcp` don't use the cache.
+
+## Share the cache across checkouts
+
+Point every checkout of a project at one directory with `E2E_CACHE_DIR`, or
+`--cache-dir` for one run. Either replaces `cache.dir`, resolves from the
+project root (`~` or a leading `~/` is your home directory), and leaves the mode
+alone. With a custom `cache.store`, `--cache-dir` is an error and
+`E2E_CACHE_DIR` is ignored. Parallel runs can share the directory: each write
+replaces its file atomically. Entries are keyed by project, so give every
+checkout the same `projectId` (or `package.json` `name`); without either,
+each checkout's path becomes its identity and nothing replays across them.
+
+- Checkouts share entries: a failing run in any of them evicts the entry, and
+  checkouts with the same app identity but different app code overwrite each
+  other's entries (the last write wins).
+- While the override is set, a cache committed under `cache.dir` isn't read.
+- Use one directory per project. Two projects in one directory can fail with
+  a false `REPLAY_STALE` under `cache.strict`.
+
+```bash
+E2E_CACHE_DIR=~/.cache/my-app/e2e npx e2e run
+```
 
 ## Commit the replay cache
 

@@ -50,6 +50,8 @@ This project is a pnpm monorepo. `packages/` holds what publishes to npm,
 - `docs/`: the docs site, built with [Mintlify](https://mintlify.com)
 - `skills/e2e/`: the agent skill shipped with the package and installed by `e2e init`
 - `skills/create-verification-skill/`: the generator of a project-local `verify-<app>` skill, installed with `npx skills add tester-army/e2e --skill create-verification-skill`
+- `skills/migrate-to-e2e/`: ports an existing Playwright, Cypress, Selenium, Detox, or Maestro suite one slice at a time, installed with `npx skills add tester-army/e2e --skill migrate-to-e2e`
+- `plugins/e2e/`: the Claude Code and Codex plugin of the three skills, installed from this repository as a marketplace with `claude plugin marketplace add tester-army/e2e` or `codex plugin marketplace add tester-army/e2e`
 - `.dev/skills/`: the skills coding agents use to work on this repo, symlinked from `.claude/skills/` so `npx skills add tester-army/e2e` offers only `skills/*`
 
 On Windows, enable Developer Mode and clone with
@@ -145,6 +147,13 @@ If your change affects `e2e`, `@e2e-dev/web`, `@e2e-dev/mobile`, or
 pnpm changeset
 ```
 
+While a package is `0.x`, a feature or fix is a `patch`. A breaking change
+is a `minor` whose summary opens with `**Breaking:**`. A release a maintainer
+calls (a big launch, `1.0`) opens with `**Release:**` and may be a `minor` or
+`major`. `pnpm check` fails on any other `0.x` minor or major. `e2e init` writes
+`^0.x.y`, which on `0.x` takes patches only, so features as patches reach
+users without a `package.json` edit.
+
 Changes limited to the apps (testbed, web benchmark, mobile benchmark), docs,
 or CI don't need one. Everything under `apps/` is private and skipped entirely
 (`privatePackages: false`), so none gets a version bump, a changelog, or a git
@@ -160,7 +169,9 @@ workflow opens a `chore: version packages` pull request that applies the
 pending changesets. That PR gets no CI of its own (it is opened with
 `GITHUB_TOKEN`), so check `main` is green before merging it. Merging it checks
 peer ranges, builds, publishes the new versions, and creates the matching
-GitHub release. `@e2edev/e2e` is the
+GitHub release. A release that published `e2e` then lists it in the MCP
+Registry (`mcp-registry.yml`); to retry a failed listing, run that workflow
+by hand with the version. `@e2edev/e2e` is the
 runner's retired name, and the `@e2edev` scope is the engines' and reporters'
 retired scope; both are deprecated on npm.
 
@@ -266,8 +277,8 @@ prompts and tool descriptions.
   on, twice a year.
 - Removal happens at the end of the window, in a minor release while the
   packages are `0.x` (semver treats `0.x` minors as breaking) and in a major
-  release from `1.0` onward. The changeset body names both the removed form
-  and its replacement, and the PR title carries the `!`.
+  release from `1.0` onward. The changeset body opens with `**Breaking:**`,
+  names both the removed form and its replacement, and the PR title carries the `!`.
 - A deprecation is announced in three places when it lands: the changeset
   (so it reaches the changelog and the GitHub release), the reference page
   for the surface, and a runtime warning the first time the old form is used
@@ -282,5 +293,5 @@ build against, and what a third-party engine builds against too. A change to
 that contract bumps all three packages together in one release, with a
 changeset for each, so an engine and a runner from the same release always
 match. Engines declare a peer range on `e2e` that points one way only
-(engine to runner, `>=x <1`), and each integration (`@e2e-dev/kernel`, `@e2e-dev/eas`, `@e2e-dev/smol`) does
+(engine to runner, `>=x <1`), and each integration (`@e2e-dev/kernel`, `@e2e-dev/lightpanda`, `@e2e-dev/eas`, `@e2e-dev/smol`, `@e2e-dev/testmu`) does
 the same on the engines it plugs into; do not make it mutual or narrow it.
