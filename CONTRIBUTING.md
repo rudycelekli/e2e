@@ -111,8 +111,7 @@ pnpm bench:ab -- tests-agent/control-inventory.e2e.ts --config e2e.agent.config.
 ```
 
 It prints a markdown table to paste into the PR, and lists first any test
-whose behavior changed. When both builds have varying step sequences, the
-comparison names instability on each side. `AGENTS.md` describes the output.
+whose behavior changed. `AGENTS.md` describes the output.
 
 ### Commit message convention
 
