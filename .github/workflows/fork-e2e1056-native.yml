@@ -1,0 +1,87 @@
+name: Fork e2e1056 native qualification
+on:
+  push:
+    branches: [validation/e2e1056-native-20261016]
+permissions:
+  contents: read
+concurrency:
+  group: fork-e2e1056-native
+  cancel-in-progress: false
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      E2E_TELEMETRY_DISABLED: '1'
+      DO_NOT_TRACK: '1'
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 57115415cc841aa97d89905724d8c13e74c7aaa9
+          fetch-depth: 3
+          persist-credentials: false
+      - name: Guard frozen source
+        run: |
+          test "$(git rev-parse HEAD)" = 57115415cc841aa97d89905724d8c13e74c7aaa9
+          test "$(git rev-parse HEAD^{tree})" = 5c236406c617ae58be57435e28c554069d89725c
+          test "$(git show -s --format=%P HEAD)" = "8a3ce2f34fe26f7923a7424617ac6927d72e1f78 ff3bf3917f2b5bb0f81e5bc5f4fdaa24d023afd0"
+          git diff --exit-code
+      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
+        with:
+          version: 12.3.4
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 26
+      - name: Install exact lockfile and build native packages
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+      - name: Reproduce retained passed-member duration on old production source
+        shell: bash
+        run: |
+          set -euo pipefail
+          source=packages/e2e/src/report/outcome.ts
+          cp "$source" "$RUNNER_TEMP/outcome-fixed.ts"
+          trap 'cp "$RUNNER_TEMP/outcome-fixed.ts" "$source"' EXIT
+          git show HEAD^1:"$source" > "$source"
+          set +e
+          pnpm --filter e2e exec vitest run tests/unit/report-outcome.test.ts --reporter=json --outputFile="$RUNNER_TEMP/e2e1056-before.json"
+          before_rc=$?
+          set -e
+          test "$before_rc" -ne 0
+          python3 - "$RUNNER_TEMP/e2e1056-before.json" <<'PYTHON'
+          import json,re,sys
+          d=json.load(open(sys.argv[1])); print(json.dumps(d))
+          cases=[a for t in d['testResults'] for a in t['assertionResults']]
+          bad=[a for a in cases if 'retains the earlier passed member' in a.get('fullName','')]
+          assert len(bad)==1 and bad[0]['status']=='failed', bad
+          msg=re.sub(r'\x1b\[[0-9;]*m','', '\n'.join(bad[0].get('failureMessages',[])))
+          assert re.search(r'expected\s+300\s+to be\s+1200',msg), msg
+          first=[a for a in cases if 'completed member timing from an interrupted first attempt' in a.get('fullName','')]
+          assert len(first)==1 and first[0]['status']=='passed',first
+          print('Native old production source selects discarded retry 300ms; retained verdict is 1200ms')
+          PYTHON
+          cp "$RUNNER_TEMP/outcome-fixed.ts" "$source"
+          pnpm --filter e2e exec vitest run tests/unit/report-outcome.test.ts tests/unit/report-junit.test.ts tests/unit/report-markdown.test.ts
+          git diff --exit-code
+      - name: Build restored source and run built-CLI reporter integration
+        run: |
+          pnpm run build
+          pnpm --filter e2e exec vitest run tests/integration/interrupt-signals.test.ts
+      - name: Native full core unit suite
+        run: pnpm --filter e2e run test:unit
+      - name: Required full repository checks
+        run: pnpm check
+      - name: Install deterministic local Chromium
+        run: node packages/web/dist/bin.js install chromium --with-deps
+      - name: Built CLI deterministic testbed
+        run: pnpm --filter @e2e-dev/testbed test
+      - name: Built CLI deterministic web benchmark
+        run: pnpm --filter @e2e-dev/web-benchmark test
+      - name: Final frozen source guard
+        if: always()
+        run: |
+          test "$(git rev-parse HEAD)" = 57115415cc841aa97d89905724d8c13e74c7aaa9
+          test "$(git rev-parse HEAD^{tree})" = 5c236406c617ae58be57435e28c554069d89725c
+          git diff --exit-code
