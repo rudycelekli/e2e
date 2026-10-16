@@ -9,7 +9,7 @@ icon: "brain"
 import { ModelProvider } from './snippets/model-provider.jsx';
 
 Agent steps use the model you set in `e2e.config.ts`. There is no default.
-The model comes from an [AI SDK](https://ai-sdk.dev/providers) provider: a
+The model comes from an [AI SDK](https://ai-sdk.dev/providers/ai-sdk-providers) provider: a
 gateway, a direct API key, a local server, or your
 [subscription](/subscriptions). For a first setup, `e2e init` writes the
 config. See the [quickstart](/quickstart#use-a-subscription-or-api-key).
@@ -84,7 +84,10 @@ credentials. See [AI SDK providers](#ai-sdk-providers).
   <Tab title="Local or self-hosted">
 
 Install `@ai-sdk/openai-compatible`. Set the endpoint URL and a model ID the
-endpoint serves. Add `apiKey` if the server needs one:
+endpoint serves. Add `apiKey` if the server needs one. Set
+`supportsStructuredOutputs: true` when the server accepts a JSON schema
+response format, as Ollama does. Without it, the AI SDK drops the schema with a
+`responseFormat` warning and agent steps may take more model calls:
 
 ```ts title="Model setup"
 import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
@@ -92,6 +95,7 @@ import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 const local = createOpenAICompatible({
   name: 'local',
   baseURL: 'http://127.0.0.1:11434/v1',
+  supportsStructuredOutputs: true,
   // apiKey: process.env.LLM_API_KEY,
 });
 
@@ -136,7 +140,8 @@ when your shell exports it, or when the config loads the file with
 
 ## AI SDK providers
 
-Every AI SDK provider that supports tool calls works. Select yours:
+Every AI SDK provider that supports tool calls works. Each provider's
+package and variables are on its [AI SDK provider page](https://ai-sdk.dev/providers/ai-sdk-providers). Select yours:
 
 <ModelProvider show="select" />
 
@@ -246,6 +251,7 @@ them.
 | --- | --- | --- |
 | A model is a string instead of an AI SDK instance | `INVALID_CONFIG` | Construct it, for example `gateway('openai/gpt-6-luna-fast')`. |
 | The built-in agent has no model | `MODEL_UNAVAILABLE` | Set `agents.<name>.model`. |
+| GitHub Copilot doesn't serve the model to your account | `MODEL_UNAVAILABLE` | Pick an id your plan serves. See [Pick a model](/subscriptions#pick-a-model). |
 | A provider that reads its key at config load has none | `CONFIG_LOAD_FAILED` | Set the key. |
 | Authentication fails on the first model call | `MODEL_PROVIDER_FAILED` | Check the provider's API key, or run `npx e2e login` for a subscription. For Vercel OIDC the message names only `AI_GATEWAY_API_KEY`. Check `vercel login` and `.vercel/project.json`. |
 | The `ai` package is missing | `MODEL_UNAVAILABLE` | Install `ai`. See [Pick a gateway or a provider](#pick-a-gateway-or-a-provider). |
