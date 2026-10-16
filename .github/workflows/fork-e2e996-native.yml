@@ -1,0 +1,75 @@
+name: Fork e2e996 native qualification
+on:
+  push:
+    branches: [validation/e2e996-native-20261016]
+permissions:
+  contents: read
+concurrency:
+  group: private-e2e996-native
+  cancel-in-progress: false
+jobs:
+  qualify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      E2E_TELEMETRY_DISABLED: '1'
+      DO_NOT_TRACK: '1'
+      CI: 'true'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: 394aab7ebaca048302cf2a98c0d99bb850b19aaa
+          fetch-depth: 2
+          persist-credentials: false
+      - name: Guard frozen source
+        run: |
+          test "$(git rev-parse HEAD)" = 394aab7ebaca048302cf2a98c0d99bb850b19aaa
+          test "$(git rev-parse HEAD^{tree})" = 6d20c8872b99ca36ede1f3395e5c2ff0e2b48023
+          test "$(git rev-parse HEAD^)" = 8f3771eea9e9b67553fb2558793f6a0f2cc57002
+          git diff --exit-code
+      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 26
+      - name: Install exact lockfile and build native packages
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build
+      - name: Native before and after regression, source restored on failure
+        shell: bash
+        run: |
+          set -euo pipefail
+          runner=packages/e2e/src/run/runner.ts
+          cp "$runner" "$RUNNER_TEMP/runner-fixed.ts"
+          trap 'cp "$RUNNER_TEMP/runner-fixed.ts" "$runner"' EXIT
+          git show HEAD^:"$runner" > "$runner"
+          pnpm --filter e2e run build
+          set +e
+          pnpm --filter e2e exec vitest run tests/integration/runner-lifecycle.test.ts -t 'rejects incomplete SDK shards before startup and accepts boundary shards' --reporter=json --outputFile="$RUNNER_TEMP/e2e996-before.json"
+          before_rc=$?
+          set -e
+          test "$before_rc" -ne 0
+          python3 - "$RUNNER_TEMP/e2e996-before.json" <<'PYTHON'
+          import json,re,sys
+          d=json.load(open(sys.argv[1])); print(json.dumps(d)); matches=[a for t in d['testResults'] for a in t['assertionResults'] if 'rejects incomplete SDK shards before startup and accepts boundary shards' in a.get('fullName','')]
+          assert len(matches)==1 and matches[0]['status']=='failed', matches
+          msg=re.sub(r'\x1b\[[0-9;]*m','', '\n'.join(matches[0].get('failureMessages',[])))
+          assert re.search(r'expected\s+\+?0\s+to be\s+2',msg), msg
+          print('Native parent causally accepts incomplete shard: observed exit 0 rather than 2')
+          PYTHON
+          cp "$RUNNER_TEMP/runner-fixed.ts" "$runner"
+          pnpm --filter e2e run build
+          pnpm --filter e2e exec vitest run tests/integration/runner-lifecycle.test.ts -t 'rejects incomplete SDK shards before startup and accepts boundary shards'
+          git diff --exit-code
+      - name: Native package unit tests
+        run: pnpm --filter e2e run test:unit
+      - name: Lint and typecheck
+        run: |
+          pnpm lint
+          pnpm typecheck
+      - name: Final frozen source guard
+        if: always()
+        run: |
+          test "$(git rev-parse HEAD)" = 394aab7ebaca048302cf2a98c0d99bb850b19aaa
+          test "$(git rev-parse HEAD^{tree})" = 6d20c8872b99ca36ede1f3395e5c2ff0e2b48023
+          git diff --exit-code
