@@ -56,7 +56,14 @@ export function outcome(result: ReportResult, groups: ReadonlyMap<string, Report
   const views = attemptViews(result, groups);
   const earlier = views.slice(0, -1);
   const final = views.at(-1) ?? NO_ATTEMPT;
-  const verdict = views.findLast((attempt) => reachedVerdict(result.status, attempt.status)) ?? final;
+  const serialAttempts = result.serialGroupId === undefined ? undefined : groups.get(result.serialGroupId)?.attempts;
+  const verdict = views.findLast((attempt, index) => {
+    const serial = serialAttempts?.[index];
+    // The runner discards a cut retry's members, including ones that passed.
+    // Keep those views in history, but never let them replace its retained verdict.
+    if (serial !== undefined && ((index > 0 && serial.status === 'interrupted') || !serial.members.some((member) => member.testId === result.testId))) return false;
+    return reachedVerdict(result.status, attempt.status);
+  }) ?? final;
   return {
     durationMs: verdict.durationMs,
     final,

@@ -2,4 +2,4 @@
 "e2e": patch
 ---
 
-Report a failed test's duration from its failed attempt when the run interrupts its retry, instead of the retry's time.
+Keep each serial member's measured duration with its retained verdict when a retry is interrupted or never reaches that member. Preserve completed member timing when the first attempt is interrupted too. Non-serial failed tests retain their failed attempt's duration after an interrupted retry.
