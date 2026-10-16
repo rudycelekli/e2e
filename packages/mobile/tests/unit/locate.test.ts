@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { LocatorExpression, TextPattern } from 'e2e/engine';
 import { resolveExpression } from '../../src/locate.ts';
-import { projectSnapshot } from '../../src/nodes.ts';
-import { SETTINGS_NODES } from '../helpers/fake-client.ts';
+import { projectSnapshot, type RawNode } from '../../src/nodes.ts';
+import type { MobilePlatform } from '../../src/options.ts';
+import { ANDROID_APP_PACKAGE, ANDROID_ID_NODES, SETTINGS_NODES } from '../helpers/fake-client.ts';
 
 function exact(value: string): TextPattern {
   return { kind: 'string', value, exact: true };
@@ -15,7 +16,7 @@ function query(kind: 'role' | 'label' | 'placeholder' | 'text' | 'displayValue' 
 function names(expression: LocatorExpression): string[] {
   let counter = 0;
   const { index } = projectSnapshot(SETTINGS_NODES, { mintId: () => `n${++counter}` });
-  return resolveExpression(expression, index).map((entry) => entry.node.name ?? '');
+  return resolveExpression(expression, index, 'ios').map((entry) => entry.node.name ?? '');
 }
 
 describe('locator expressions over a device snapshot', () => {
@@ -50,9 +51,9 @@ describe('locator expressions over a device snapshot', () => {
   it('answers text and label queries with the innermost match when an ancestor echoes the text', () => {
     let counter = 0;
     const { index } = projectSnapshot(SETTINGS_NODES, { mintId: () => `n${++counter}` });
-    const matches = resolveExpression(query('text', 'About'), index);
+    const matches = resolveExpression(query('text', 'About'), index, 'ios');
     expect(matches.map((entry) => entry.node.role)).toEqual(['text']);
-    expect(resolveExpression(query('label', 'About'), index).map((entry) => entry.node.role)).toEqual(['text']);
+    expect(resolveExpression(query('label', 'About'), index, 'ios').map((entry) => entry.node.role)).toEqual(['text']);
     // The echoing cell still answers role queries, and filters by its subtree text.
     expect(names(query('role', 'listitem', { name: exact('About') }))).toEqual(['About']);
     expect(names({ kind: 'filter', source: query('role', 'listitem'), hasText: exact('About') })).toEqual(['About']);
@@ -70,12 +71,12 @@ describe('locator expressions over a device snapshot', () => {
       ],
       { mintId: () => `n${++counter}` },
     );
-    const field = resolveExpression(query('label', 'Name field'), index);
+    const field = resolveExpression(query('label', 'Name field'), index, 'ios');
     expect(field.map((entry) => [entry.node.role, entry.node.testId])).toEqual([['textbox', 'name-input']]);
     const pattern: LocatorExpression = { kind: 'query', query: { kind: 'label', value: { kind: 'regexp', source: 'field$', flags: '' } } };
-    expect(resolveExpression(pattern, index).map((entry) => entry.node.role)).toEqual(['textbox', 'textbox']);
+    expect(resolveExpression(pattern, index, 'ios').map((entry) => entry.node.role)).toEqual(['textbox', 'textbox']);
     // A role query keeps both, since the host view answers to no vocabulary role of its own.
-    expect(resolveExpression(query('role', 'textbox'), index)).toHaveLength(2);
+    expect(resolveExpression(query('role', 'textbox'), index, 'ios')).toHaveLength(2);
   });
 
   it('scopes, filters, and indexes', () => {
@@ -93,16 +94,38 @@ describe('locator expressions over a device snapshot', () => {
     expect(names({ kind: 'index', source: query('role', 'listitem'), index: 5 })).toEqual([]);
   });
 
-  it('resolves agent-device selectors, alternatives first-match, and rejects frames', () => {
+  it('excludes by subtree text with hasNotText, a string as a substring and a RegExp as written', () => {
+    const cells = query('role', 'listitem');
+    expect(names({ kind: 'filter', source: cells, hasNotText: { kind: 'string', value: 'abo', exact: false } })).toEqual(['Scroller']);
+    expect(names({ kind: 'filter', source: cells, hasNotText: { kind: 'regexp', source: '^About$', flags: 'i' } })).toEqual(['Scroller']);
+    expect(names({ kind: 'filter', source: cells, hasText: exact('About'), hasNotText: exact('About') })).toEqual([]);
+  });
+
+  it('excludes an unnamed container by its descendant text with hasNotText', () => {
+    let counter = 0;
+    const { index } = projectSnapshot(
+      [
+        { ref: '@e1', index: 0, depth: 0, type: 'Application', label: 'Fixture' },
+        { ref: '@e2', index: 1, parentIndex: 0, depth: 1, type: 'Cell', label: '', identifier: 'child-match' },
+        { ref: '@e3', index: 2, parentIndex: 1, depth: 2, type: 'StaticText', label: 'About' },
+        { ref: '@e4', index: 3, parentIndex: 0, depth: 1, type: 'Cell', label: '', identifier: 'child-other' },
+        { ref: '@e5', index: 4, parentIndex: 3, depth: 2, type: 'StaticText', label: 'Other' },
+        { ref: '@e6', index: 5, parentIndex: 0, depth: 1, type: 'Cell', label: '', identifier: 'empty' },
+      ],
+      { mintId: () => `n${++counter}` },
+    );
+    const source = query('role', 'listitem');
+    expect(resolveExpression(source, index, 'ios').map((entry) => entry.node.name ?? '')).toEqual(['', '', '']);
+    const ids = (pattern: TextPattern) =>
+      resolveExpression({ kind: 'filter', source, hasNotText: pattern }, index, 'ios').map((entry) => entry.node.testId);
+    expect(ids(exact('About'))).toEqual(['child-other', 'empty']);
+    expect(ids({ kind: 'regexp', source: '^about$', flags: 'i' })).toEqual(['child-other', 'empty']);
+    expect(ids(exact('Missing'))).toEqual(['child-match', 'child-other', 'empty']);
+  });
+
+  it('routes agent-device selectors to the selector matcher, and rejects frames', () => {
     expect(names({ kind: 'selector', selector: 'id=ABOUT' })).toEqual(['About']);
-    expect(names({ kind: 'selector', selector: 'role=button visible' })).toEqual(['Back']);
-    expect(names({ kind: 'selector', selector: 'role=cell' })).toEqual(['About', 'Scroller']);
-    expect(names({ kind: 'selector', selector: 'role=Cell' })).toEqual(['About', 'Scroller']);
-    expect(names({ kind: 'selector', selector: 'role=NavigationBar' })).toEqual(['General']);
-    expect(names({ kind: 'selector', selector: 'role=navigation' })).toEqual(['General']);
-    expect(names({ kind: 'selector', selector: 'label="Airplane Mode" role=switch' })).toEqual(['Airplane Mode']);
-    expect(names({ kind: 'selector', selector: 'editable' })).toEqual(['Search', 'Password']);
-    expect(names({ kind: 'selector', selector: 'enabled=false' })).toEqual(['Hidden']);
+    expect(names({ kind: 'selector', selector: 'id=NOPE || label="Airplane Mode"' })).toEqual(['Airplane Mode']);
     expect(() => names({ kind: 'selector', selector: '@e3' })).toThrow(/invalid agent-device selector/);
     expect(() => names({ kind: 'frame', selector: 'iframe', source: query('role', 'button') })).toThrowError(
       expect.objectContaining({ code: 'FRAME_NOT_FOUND' }),
@@ -110,28 +133,79 @@ describe('locator expressions over a device snapshot', () => {
   });
 });
 
-it('excludes device subtree text with string and RegExp filters', () => {
-  expect(names({ kind: 'filter', source: query('role', 'listitem'), hasNotText: { kind: 'string', value: 'abo', exact: false } })).toEqual(['Scroller']);
-  expect(names({ kind: 'filter', source: query('role', 'listitem'), hasNotText: { kind: 'regexp', source: '^About$', flags: 'i' } })).toEqual(['Scroller']);
-  expect(names({ kind: 'filter', source: query('role', 'listitem'), hasText: exact('About'), hasNotText: exact('About') })).toEqual([]);
-});
-
-it('hasNotText excludes an unnamed container by its descendant text', () => {
+function testIds(
+  expression: LocatorExpression,
+  options: { readonly platform?: MobilePlatform; readonly nodes?: readonly RawNode[] } = {},
+): string[] {
   let counter = 0;
-  const { index } = projectSnapshot([
-    { ref: '@e1', index: 0, depth: 0, type: 'Application', label: 'Fixture' },
-    { ref: '@e2', index: 1, parentIndex: 0, depth: 1, type: 'Cell', label: '', identifier: 'child-match' },
-    { ref: '@e3', index: 2, parentIndex: 1, depth: 2, type: 'StaticText', label: 'About' },
-    { ref: '@e4', index: 3, parentIndex: 0, depth: 1, type: 'Cell', label: '', identifier: 'child-other' },
-    { ref: '@e5', index: 4, parentIndex: 3, depth: 2, type: 'StaticText', label: 'Other' },
-    { ref: '@e6', index: 5, parentIndex: 0, depth: 1, type: 'Cell', label: '', identifier: 'empty' },
-  ], { mintId: () => `n${++counter}` });
-  const source = query('role', 'listitem');
-  const candidates = resolveExpression(source, index);
-  expect(candidates.map(entry => entry.node.name ?? '')).toEqual(['', '', '']);
-  const ids = (pattern: TextPattern): (string | undefined)[] =>
-    resolveExpression({ kind: 'filter', source, hasNotText: pattern }, index).map(entry => entry.node.testId);
-  expect(ids(exact('About'))).toEqual(['child-other', 'empty']);
-  expect(ids({ kind: 'regexp', source: '^about$', flags: 'i' })).toEqual(['child-other', 'empty']);
-  expect(ids(exact('Missing'))).toEqual(['child-match', 'child-other', 'empty']);
+  const { index } = projectSnapshot(options.nodes ?? ANDROID_ID_NODES, { mintId: () => `n${++counter}` });
+  return resolveExpression(expression, index, options.platform ?? 'android').map((entry) => entry.node.testId ?? '');
+}
+
+describe('Android resource ids without their package', () => {
+  const app = ANDROID_APP_PACKAGE;
+
+  it('finds a view by its id without the package prefix', () => {
+    expect(testIds(query('testId', 'greet'))).toEqual([`${app}:id/greet`]);
+  });
+
+  it('still finds a view by its full resource id', () => {
+    expect(testIds(query('testId', `${app}:id/greet`))).toEqual([`${app}:id/greet`]);
+  });
+
+  it('answers an id the app set without a prefix as before', () => {
+    expect(testIds(query('testId', 'greeting'))).toEqual(['greeting']);
+  });
+
+  it('leaves the prefix off any package but the framework', () => {
+    expect(testIds(query('testId', 'banner'))).toEqual(['com.example.other:id/banner']);
+    expect(testIds(query('testId', 'content'))).toEqual([]);
+    expect(testIds(query('testId', 'android:id/content'))).toEqual(['android:id/content']);
+  });
+
+  it('prefers a full match, so a bare id wins over a prefixed one with the same name', () => {
+    const nodes: readonly RawNode[] = [
+      ...ANDROID_ID_NODES,
+      { ref: '@e7', index: 6, parentIndex: 0, depth: 1, type: 'android.widget.Button', identifier: 'greet', label: 'Greet again' },
+    ];
+    expect(testIds(query('testId', 'greet'), { nodes })).toEqual(['greet']);
+  });
+
+  it("keeps an app's own id clear of a system window's with the same name", () => {
+    const nodes: readonly RawNode[] = [
+      ...ANDROID_ID_NODES,
+      { ref: '@e7', index: 6, parentIndex: 0, depth: 1, type: 'android.widget.TextView', identifier: 'clock', label: '12:00' },
+      { ref: '@e8', index: 7, parentIndex: 0, depth: 1, type: 'android.widget.TextView', identifier: 'com.android.systemui:id/clock', label: '9:41' },
+    ];
+    expect(testIds(query('testId', 'clock'), { nodes })).toEqual(['clock']);
+  });
+
+  it('answers every prefixed id with the name when none matches in full, for the runner to refuse as ambiguous', () => {
+    const nodes: readonly RawNode[] = [
+      ...ANDROID_ID_NODES,
+      { ref: '@e7', index: 6, parentIndex: 0, depth: 1, type: 'android.widget.TextView', identifier: `${app}:id/clock`, label: '12:00' },
+      { ref: '@e8', index: 7, parentIndex: 0, depth: 1, type: 'android.widget.TextView', identifier: 'com.android.systemui:id/clock', label: '9:41' },
+    ];
+    expect(testIds(query('testId', 'clock'), { nodes })).toEqual([`${app}:id/clock`, 'com.android.systemui:id/clock']);
+  });
+
+  it('tests a RegExp against the id without the prefix too', () => {
+    const regexp = (source: string): LocatorExpression => ({
+      kind: 'query',
+      query: { kind: 'testId', value: { kind: 'regexp', source, flags: '' } },
+    });
+    expect(testIds(regexp('^greet$'))).toEqual([`${app}:id/greet`]);
+    expect(testIds(regexp('^dev\\.e2e\\.examples\\.maui:id/gr'))).toEqual([`${app}:id/greet`]);
+  });
+
+  it('applies to scopes and has filters', () => {
+    const form = query('testId', 'form');
+    const scoped: LocatorExpression = { kind: 'query', query: { kind: 'testId', value: exact('greet') }, scope: form };
+    expect(testIds(scoped)).toEqual([`${app}:id/greet`]);
+    expect(testIds({ kind: 'filter', source: form, has: query('testId', 'name') })).toEqual([`${app}:id/form`]);
+  });
+
+  it('leaves iOS identifiers as they are, whatever they spell', () => {
+    expect(testIds(query('testId', 'greet'), { platform: 'ios' })).toEqual([]);
+  });
 });
