@@ -43,7 +43,7 @@ import {
   testIdQuery,
   textQuery,
 } from './expression.ts';
-import { cutOffAtDeadline, type Deadline, isOperationTimeout, POLL_INTERVAL_MS, pollCondition, sleep } from '../internal/time.ts';
+import { cutOffAtDeadline, type Deadline, isOperationTimeout, POLL_INTERVAL_MS, pollCondition } from '../internal/time.ts';
 import { SampleHistory } from '../expect/samples.ts';
 import type { ScreenshotContext } from '../run/screenshots.ts';
 
@@ -298,7 +298,6 @@ class ScreenImpl implements Screen {
           }
           throw cause;
         }
-        await sleep(Math.min(POLL_INTERVAL_MS, deadline.remaining()), engine.signal);
       }
     });
   }
@@ -387,17 +386,25 @@ class LocatorImpl extends ScreenImpl implements Locator {
   }
 
   doubleTap(options?: ClickOptions): Promise<void> {
-    return this.clickWith('doubleTap', options);
+    return this.clickWith('doubleTap', 'doubleTap', options);
+  }
+
+  dblclick(options?: ClickOptions): Promise<void> {
+    return this.clickWith('dblclick', 'doubleTap', options);
   }
 
   secondaryTap(options?: ClickOptions): Promise<void> {
-    return this.clickWith('secondaryTap', options);
+    return this.clickWith('secondaryTap', 'secondaryTap', options);
   }
 
   /** A double or secondary tap, with the keys `modifiers` holds for it. */
-  private clickWith(verb: 'doubleTap' | 'secondaryTap', options: ClickOptions | undefined): Promise<void> {
-    rejectUnknownOptions(verb, options, ['timeout', 'modifiers']);
-    return this.dispatchTap(verb, verb, requireModifiers(options?.modifiers, verb), options?.timeout);
+  private clickWith(
+    api: 'doubleTap' | 'dblclick' | 'secondaryTap',
+    kind: 'doubleTap' | 'secondaryTap',
+    options: ClickOptions | undefined,
+  ): Promise<void> {
+    rejectUnknownOptions(api, options, ['timeout', 'modifiers']);
+    return this.dispatchTap(api, kind, requireModifiers(options?.modifiers, api), options?.timeout);
   }
 
   /** One tap kind with the keys it holds, named after the node in the step label. */

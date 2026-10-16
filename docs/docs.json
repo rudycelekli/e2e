@@ -134,7 +134,8 @@
               "index",
               "quickstart",
               "core-concepts",
-              "coding-agents"
+              "coding-agents",
+              "mcp"
             ]
           },
           {
@@ -148,6 +149,7 @@
           {
             "group": "Features",
             "pages": [
+              "cache",
               "explore",
               "visual-testing",
               "authentication",
@@ -160,8 +162,7 @@
             "pages": [
               "models",
               "decision-models",
-              "subscriptions",
-              "cache"
+              "subscriptions"
             ]
           },
           {
@@ -180,8 +181,11 @@
             "pages": [
               "integrations/index",
               "integrations/kernel",
+              "integrations/lightpanda",
               "integrations/eas",
-              "integrations/smol"
+              "integrations/smol",
+              "integrations/limrun",
+              "integrations/testmu"
             ]
           },
           {
@@ -237,7 +241,8 @@
               "reference/mcp",
               "reference/reporters",
               "reference/environment",
-              "reference/errors"
+              "reference/errors",
+              "reference/security"
             ]
           },
           {
@@ -271,7 +276,8 @@
   },
   "footer": {
     "socials": {
-      "github": "https://github.com/tester-army/e2e"
+      "github": "https://github.com/tester-army/e2e",
+      "website": "https://tester.army/?utm_source=e2e&utm_medium=docs&utm_campaign=docs_footer"
     }
   },
   "redirects": [
