@@ -198,6 +198,23 @@ describe('browser.route decisions', () => {
     expect(hits.get('/echo')).toBeUndefined();
   });
 
+  it('routes real native dialogs by kind even when their messages are identical', async () => {
+    const kinds: string[] = [];
+    const off = await browser.onDialog(async dialog => {
+      kinds.push(dialog.type);
+      if (dialog.type === 'prompt') await dialog.accept('typed answer');
+      else if (dialog.type === 'confirm') await dialog.dismiss();
+      else await dialog.accept();
+    });
+    const answers = await browser.evaluate(() => {
+      window.alert('same message');
+      return { confirmed: window.confirm('same message'), prompt: window.prompt('same message') };
+    });
+    expect(kinds).toEqual(['alert', 'confirm', 'prompt']);
+    expect(answers).toEqual({ confirmed: false, prompt: 'typed answer' });
+    await off();
+  });
+
   it('answers with the route registered last when two fulfill', async () => {
     await browser.route('**/api/**', (route) => route.fulfill({ body: 'earlier' }));
     await browser.route('**/api/quote', (route) => route.fulfill({ body: 'later' }));
