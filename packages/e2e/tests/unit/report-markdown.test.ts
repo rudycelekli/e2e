@@ -527,15 +527,15 @@ describe('renderMarkdownReport', () => {
 
   it.each(['interrupted', 'failed'] as const)('tells a serial member from its verdict when a %s retry was cut', (status) => {
     const member = named({ title: 'step two', status: 'failed', serialGroupId: 'g1' });
-    const memberRecord = (status: 'failed' | 'skipped') => ({
-      id: `m-${status}`,
+    const memberRecord = (memberStatus: 'failed' | 'skipped') => ({
+      id: `m-${memberStatus}`,
       index: 0,
       testId: member.testId,
-      status,
+      status: memberStatus,
       startedAt: REPORT_AT,
       durationMs: 40,
-      steps: status === 'failed' ? [step({ index: 0, label: 'tap Next', status: 'failed', error: reportError({ message: 'nope' }) })] : [],
-      ...(status === 'failed'
+      steps: memberStatus === 'failed' ? [step({ index: 0, label: 'tap Next', status: 'failed', error: reportError({ message: 'nope' }) })] : [],
+      ...(memberStatus === 'failed'
         ? { error: { category: 'test' as const, code: 'ASSERTION_FAILED', message: 'nope', retryable: false } }
         : { skip: { cause: 'serial-predecessor-failed' as const, reason: 'group attempt did not reach this member' } }),
       secondaryErrors: [],

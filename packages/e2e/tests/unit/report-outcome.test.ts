@@ -57,6 +57,13 @@ describe('serial verdict attempt', () => {
     expect(result.attempts).toHaveLength(2);
   });
 
+  it('reads an older skipped serial attempt without treating it as a cut retry', () => {
+    const skipped: ReportSerialAttempt = { ...serialAttempt(1, 'failed', 0), status: 'skipped', members: [] };
+    const result = serialOutcome([skipped], 'skipped');
+    expect(result.verdict).toBe(result.final);
+    expect(result.verdict.status).toBe('skipped');
+  });
+
   it('keeps a first attempt that never reached its members as the verdict', () => {
     const first = { ...serialAttempt(0, 'failed', 0), cutRetry: false };
     expect(serialOutcome([first], 'failed').verdict).toEqual(serialOutcome([first], 'failed').final);

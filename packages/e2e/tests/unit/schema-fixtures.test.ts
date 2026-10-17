@@ -6,6 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { Ajv2020 } from 'ajv/dist/2020.js';
 import addFormats from 'ajv-formats';
 import { describe, expect, it } from 'vitest';
+import type { Report1Document } from '../../src/report/build.ts';
+import { outcome } from '../../src/report/outcome.ts';
 
 const PACKAGE_ROOT = path.resolve(fileURLToPath(import.meta.url), '..', '..', '..');
 const SCHEMA_ROOT = path.join(PACKAGE_ROOT, 'schema');
@@ -35,6 +37,29 @@ describe.each(schemas)('%s schema', (name) => {
   });
 
   if (name === 'report-v1') {
+    it('keeps the cut-retry fixture a distinct coherent serial member', () => {
+      const report = readJson('fixtures', 'report-v1.valid.json') as Report1Document;
+      const group = report.run.serialGroups![0]!;
+      const ordinary = report.run.results[0]!;
+      expect(ordinary.serialGroupId).toBeUndefined();
+      expect(ordinary.status).toBe('passed');
+      expect(ordinary.attempts).not.toHaveLength(0);
+      const member = report.run.results.find((result) => result.serialGroupId === group.id)!;
+      expect(member).toBeDefined();
+      expect(member.testId).not.toBe(ordinary.testId);
+      expect(group.memberTestIds).toEqual([member.testId]);
+      expect(member.attempts).toEqual([]);
+      expect(member.status).toBe('failed');
+      for (const attempt of group.attempts) {
+        expect(attempt.members.map((entry) => entry.testId)).toEqual(group.memberTestIds);
+      }
+      const verdict = outcome(member, new Map([[group.id, group]]));
+      expect(verdict.durationMs).toBe(1250);
+      expect(verdict.final.durationMs).toBe(0);
+      expect(report.run.summary).toMatchObject({ discovered: 3, selected: 3, executed: 3, passed: 1, failed: 1, skipped: 1 });
+      expect(report.run.results.filter((result) => result.status === 'failed')).toHaveLength(report.run.summary.failed);
+    });
+
     it('accepts optional runner cut-retry decisions and rejects other types', () => {
       const report = readJson('fixtures', 'report-v1.valid.json') as {
         run: { serialGroups: { attempts: Record<string, unknown>[] }[] };

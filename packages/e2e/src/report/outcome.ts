@@ -62,7 +62,7 @@ export function outcome(result: ReportResult, groups: ReadonlyMap<string, Report
     const serial = serialAttempts?.[index];
     // The runner discards a cut retry's members, including ones that passed.
     // Keep those views in history, but never let them replace its retained verdict.
-    if (serial !== undefined && (serial.cutRetry ?? isCutSerialRetry(serial.status, index))) return false;
+    if (serial !== undefined && (serial.cutRetry ?? (serial.status !== 'skipped' && isCutSerialRetry(serial.status, index)))) return false;
     return reachedVerdict(result.status, attempt.status);
   }) ?? final;
   return {
