@@ -156,8 +156,8 @@ describe('renderJunitReport', () => {
       memberTestIds: ['test-1'],
       status: 'failed',
       attempts: [
-        { ...reportAttempt({ status: 'failed', durationMs: 1300 }), members: [{ ...member, id: 'member-1', status: 'failed', durationMs: 1250, error: reportError() }] },
-        { ...reportAttempt({ id: 'attempt-2', index: 1, status, durationMs: 20 }), cutRetry: true, members: [{ ...member, id: 'member-2', status: status === 'failed' ? 'failed' : 'skipped', durationMs: 0, ...(status === 'failed' ? { error: reportError({ message: 'retry launch failed' }) } : {}) }] },
+        { ...reportAttempt({ status: 'failed', durationMs: 1300 }), status: 'failed', members: [{ ...member, id: 'member-1', status: 'failed', durationMs: 1250, error: reportError() }] },
+        { ...reportAttempt({ id: 'attempt-2', index: 1, status, durationMs: 20 }), status, cutRetry: true, members: [{ ...member, id: 'member-2', status: status === 'failed' ? 'failed' : 'skipped', durationMs: 0, ...(status === 'failed' ? { error: reportError({ message: 'retry launch failed' }) } : {}) }] },
       ],
     };
     const xml = render(
@@ -412,6 +412,7 @@ describe('renderJunitReport', () => {
       attempts: [
         {
           ...reportAttempt({ status: 'failed', durationMs: 3000 }),
+          status: 'failed',
           members: [
             {
               id: 'member-1',

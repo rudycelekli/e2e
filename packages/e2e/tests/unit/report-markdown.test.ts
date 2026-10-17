@@ -496,9 +496,10 @@ describe('renderMarkdownReport', () => {
       memberTestIds: [member.testId],
       status: 'failed',
       attempts: [
-        { ...attempt({ status: 'failed', artifacts: ['video'] }), members: [] },
+        { ...attempt({ status: 'failed', artifacts: ['video'] }), status: 'failed', members: [] },
         {
           ...attempt({ status: 'failed', artifacts: ['screenshot'] }),
+          status: 'failed',
           members: [
             {
               id: 'm',
@@ -554,8 +555,8 @@ describe('renderMarkdownReport', () => {
       memberTestIds: [member.testId],
       status: 'failed',
       attempts: [
-        { ...attempt({ status: 'failed' }), members: [memberRecord('failed')] },
-        { ...attempt({ status, error: { code: 'INTERRUPTED', message: 'retry could not finish' } }), cutRetry: true, members: [{ ...memberRecord(status === 'failed' ? 'failed' : 'skipped'), error: reportError({ code: 'INTERRUPTED', message: 'retry could not finish' }), steps: [] }] },
+        { ...attempt({ status: 'failed' }), status: 'failed', members: [memberRecord('failed')] },
+        { ...attempt({ status, error: { code: 'INTERRUPTED', message: 'retry could not finish' } }), status, cutRetry: true, members: [{ ...memberRecord(status === 'failed' ? 'failed' : 'skipped'), error: reportError({ code: 'INTERRUPTED', message: 'retry could not finish' }), steps: [] }] },
       ],
     };
     const body = renderMarkdownReport(page({ status: 'interrupted', results: [member], serialGroups: [group] }));

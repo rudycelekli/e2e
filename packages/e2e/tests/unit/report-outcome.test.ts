@@ -6,6 +6,7 @@ import { REPORT_AT, reportAttempt, reportError, reportResult } from '../helpers/
 function serialAttempt(index: number, status: 'failed' | 'interrupted', durationMs: number): ReportSerialAttempt {
   return {
     ...reportAttempt({ index, status }),
+    status,
     members: [{ id: `member-${index}`, index: 0, testId: 'test-1', status: 'passed', startedAt: REPORT_AT, durationMs, steps: [], secondaryErrors: [] }],
   };
 }
