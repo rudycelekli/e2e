@@ -9,6 +9,7 @@
 import type { SkipInfo } from '../collect/select.ts';
 import type { FailureEvidence } from '../run/records.ts';
 import type { AppLogRecord } from '../run/steps.ts';
+import { isCutSerialRetry } from '../run/retry.ts';
 import type { ReportError, ReportResult, ReportSerialGroup, ReportStep } from './build.ts';
 
 type ReportArtifact = ReportResult['attempts'][number]['artifacts'][number];
@@ -61,7 +62,7 @@ export function outcome(result: ReportResult, groups: ReadonlyMap<string, Report
     const serial = serialAttempts?.[index];
     // The runner discards a cut retry's members, including ones that passed.
     // Keep those views in history, but never let them replace its retained verdict.
-    if (serial !== undefined && ((index > 0 && serial.status === 'interrupted') || !serial.members.some((member) => member.testId === result.testId))) return false;
+    if (serial !== undefined && (serial.cutRetry ?? isCutSerialRetry(serial.status, index))) return false;
     return reachedVerdict(result.status, attempt.status);
   }) ?? final;
   return {

@@ -18,6 +18,8 @@ import { classifyError, serializeError } from '../../src/internal/errors.ts';
 import type { AttemptRecord, ResultRecord, RunError, SerialGroupRecord, SerialMemberRecord } from '../../src/run/records.ts';
 import { runUnits } from '../../src/run/scheduler.ts';
 import { serialGroupId, type SerialAttemptRun } from '../../src/run/serial.ts';
+import { buildReport } from '../../src/report/build.ts';
+import { outcome } from '../../src/report/outcome.ts';
 import { buildWorkPlans, type TargetWorkPlan, type TimeLimit } from '../../src/run/units.ts';
 import type { SpawnUnitRunner, UnitRunner, UnitRunnerEvents } from '../../src/run/unit-runner.ts';
 import type { MainToWorker, RunUnitMessage } from '../../src/run/worker/protocol.ts';
@@ -1128,6 +1130,35 @@ describe('scheduler fault handling', () => {
     expect(collected.results).toHaveLength(1);
     expect(collected.results[0]!.status).toBe(status);
     expect(collected.results[0]!.attempts).toEqual(finished);
+  });
+
+  it('reports the retained member verdict when a finished retry never reached members', async () => {
+    const target = makeTarget('web', 0);
+    const pairs = serialPairs(target).slice(0, 1);
+    const first = groupRun(pairs, 0, ['failed']);
+    first.record.members[0]!.durationMs = 1250;
+    const retry = { ...groupRun(pairs, 1, ['failed']), reachedMembers: false };
+    retry.record.members[0]!.durationMs = 0;
+    retry.record.members[0]!.error = { category: 'infrastructure', code: 'SESSION_LAUNCH_FAILED', message: 'retry launch failed', retryable: false };
+    const fleet = new FakeFleet({ hangOn: ['file::web::tests/a.e2e.ts'], serialRunsBeforeHang: [first, retry] });
+    const collected = await runForcedInterrupt(pairs, target, fleet);
+    expect(collected.serialGroups[0]!.attempts.map((attempt) => attempt.cutRetry)).toEqual([false, true]);
+    const report = buildReport({
+      runId: '018f0f5c-7b2a-7abc-8abc-0123456789ab',
+      config: undefined,
+      startedAt: '2026-01-01T00:00:00.000Z',
+      status: 'failed',
+      exitCode: 1,
+      results: collected.results,
+      serialGroups: collected.serialGroups,
+      runErrors: [],
+      targetProvenance: new Map(),
+    });
+    const groups = new Map(report.run.serialGroups.map((group) => [group.id, group]));
+    const result = outcome(report.run.results[0]!, groups);
+    expect(result.durationMs).toBe(1250);
+    expect(result.verdict.error?.code).toBe(FAILED_ATTEMPT.error!.code);
+    expect(result.final.error?.code).toBe('SESSION_LAUNCH_FAILED');
   });
 
   it.each<{ statuses: ('passed' | 'failed')[][]; verdict: string; results: string[] }>([

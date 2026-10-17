@@ -7,7 +7,9 @@
     "targets": [],
     "results": [
       {
-        "tags": [""],
+        "tags": [
+          ""
+        ],
         "attempts": [
           {
             "artifacts": [
@@ -91,6 +93,76 @@
       "interrupted": -1,
       "flaky": 0,
       "skipped": 0
-    }
+    },
+    "serialGroups": [
+      {
+        "id": "serial-example",
+        "serialId": "checkout",
+        "declarationIndex": 0,
+        "file": "tests/example.e2e.ts",
+        "source": {
+          "file": "tests/example.e2e.ts",
+          "line": 1,
+          "column": 1
+        },
+        "titlePath": [
+          "checkout"
+        ],
+        "targetId": "web",
+        "platform": "web",
+        "memberTestIds": [
+          "tests/example.e2e.ts::opens%20app"
+        ],
+        "status": "failed",
+        "attempts": [
+          {
+            "id": "018f0f5c-7b2a-7abc-8abc-0123456789ac",
+            "index": 0,
+            "cutRetry": false,
+            "status": "failed",
+            "startedAt": "2026-07-24T12:00:00.000Z",
+            "durationMs": 1250,
+            "members": [
+              {
+                "id": "018f0f5c-7b2a-7abc-8abc-0123456789ad",
+                "index": 0,
+                "testId": "tests/example.e2e.ts::opens%20app",
+                "status": "failed",
+                "startedAt": "2026-07-24T12:00:00.000Z",
+                "durationMs": 1250,
+                "steps": [],
+                "secondaryErrors": []
+              }
+            ],
+            "artifacts": [],
+            "secondaryErrors": [],
+            "cleanup": "complete"
+          },
+          {
+            "id": "018f0f5c-7b2a-7abc-8abc-0123456789ab",
+            "index": 1,
+            "cutRetry": "true",
+            "status": "failed",
+            "startedAt": "2026-07-24T12:00:00.000Z",
+            "durationMs": 0,
+            "members": [
+              {
+                "id": "018f0f5c-7b2a-7abc-8abc-0123456789ab",
+                "index": 0,
+                "testId": "tests/example.e2e.ts::opens%20app",
+                "status": "failed",
+                "startedAt": "2026-07-24T12:00:00.000Z",
+                "durationMs": 0,
+                "steps": [],
+                "secondaryErrors": []
+              }
+            ],
+            "artifacts": [],
+            "secondaryErrors": [],
+            "cleanup": "complete"
+          }
+        ]
+      }
+    ]
   }
 }

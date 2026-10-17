@@ -20,7 +20,7 @@ import type { StepRecord } from './steps.ts';
 import { findRegistered, type FileRef, type Realm, RealmManager } from './realm.ts';
 import type { AttemptRecord, ResultRecord, ResultStatus, SerialAttemptRecord, SerialGroupRecord, SerialMemberRecord, FailedStatus } from './records.ts';
 import { isFailedStatus } from './records.ts';
-import { isRetryEligible, retryVerdict, runWithRetries } from './retry.ts';
+import { isCutSerialRetry, isRetryEligible, retryVerdict, runWithRetries } from './retry.ts';
 import { interruptedSkip, pairResult } from './units.ts';
 
 /**
@@ -147,8 +147,9 @@ export async function runSerialUnit(
     group.status = finalStatus;
   }
 
+  const results = memberResults(group, members, runs);
   host.emitSerialGroup(group);
-  for (const result of memberResults(group, members, runs)) host.emit(result);
+  for (const result of results) host.emit(result);
   return group;
 }
 
@@ -188,8 +189,8 @@ function memberResults(
 ): ResultRecord[] {
   const verdicts = new Map<string, SerialMemberRecord>();
   for (const [attemptIndex, run] of runs.entries()) {
-    const cutRetry = attemptIndex > 0 && (run.record.status === 'interrupted' || !run.reachedMembers);
-    if (!cutRetry) for (const member of run.record.members) verdicts.set(member.testId, member);
+    run.record.cutRetry = isCutSerialRetry(run.record.status, attemptIndex, run.reachedMembers);
+    if (!run.record.cutRetry) for (const member of run.record.members) verdicts.set(member.testId, member);
   }
   return members.map((member) => {
     const memberRecord = verdicts.get(member.test.id);

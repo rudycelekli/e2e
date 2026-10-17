@@ -525,7 +525,7 @@ describe('renderMarkdownReport', () => {
     expect(renderMarkdownReport(page({ status: 'failed', results: [member] }))).toContain('**🔴 step two**  \n`tests/example.e2e.ts:3`\n\n**failed**\n');
   });
 
-  it('tells a serial member from the attempt that failed it when the interrupted retry skipped it', () => {
+  it.each(['interrupted', 'failed'] as const)('tells a serial member from its verdict when a %s retry was cut', (status) => {
     const member = named({ title: 'step two', status: 'failed', serialGroupId: 'g1' });
     const memberRecord = (status: 'failed' | 'skipped') => ({
       id: `m-${status}`,
@@ -555,12 +555,13 @@ describe('renderMarkdownReport', () => {
       status: 'failed',
       attempts: [
         { ...attempt({ status: 'failed' }), members: [memberRecord('failed')] },
-        { ...attempt({ status: 'interrupted', error: { code: 'INTERRUPTED', message: 'run interrupted in phase body' } }), members: [memberRecord('skipped')] },
+        { ...attempt({ status, error: { code: 'INTERRUPTED', message: 'retry could not finish' } }), cutRetry: true, members: [{ ...memberRecord(status === 'failed' ? 'failed' : 'skipped'), error: reportError({ code: 'INTERRUPTED', message: 'retry could not finish' }), steps: [] }] },
       ],
     };
     const body = renderMarkdownReport(page({ status: 'interrupted', results: [member], serialGroups: [group] }));
     expect(body).toContain('**ASSERTION_FAILED** at step 1 of 1: `screen.tap tap Next`');
-    expect(body).not.toContain('INTERRUPTED');
+    if (status === 'interrupted') expect(body).not.toContain('INTERRUPTED');
+    else expect(body).toContain('then **INTERRUPTED**');
   });
 
   it('tolerates a document written before results carried repeat, or one giving a flaky test a single attempt', () => {

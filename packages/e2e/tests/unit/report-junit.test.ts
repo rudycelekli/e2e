@@ -140,7 +140,7 @@ describe('renderJunitReport', () => {
     expect(xml).toContain('time="5.000">');
   });
 
-  it('times a failed serial member by its failed attempt when the run interrupted the retry', () => {
+  it.each(['interrupted', 'failed'] as const)('times a failed serial member by its verdict when a %s retry was cut', (status) => {
     const member = { index: 0, testId: 'test-1', startedAt: AT, steps: [], secondaryErrors: [] };
     const group: ReportSerialGroup = {
       id: 'group-1',
@@ -157,7 +157,7 @@ describe('renderJunitReport', () => {
       status: 'failed',
       attempts: [
         { ...reportAttempt({ status: 'failed', durationMs: 1300 }), members: [{ ...member, id: 'member-1', status: 'failed', durationMs: 1250, error: reportError() }] },
-        { ...reportAttempt({ id: 'attempt-2', index: 1, status: 'interrupted', durationMs: 20 }), members: [{ ...member, id: 'member-2', status: 'skipped', durationMs: 0 }] },
+        { ...reportAttempt({ id: 'attempt-2', index: 1, status, durationMs: 20 }), cutRetry: true, members: [{ ...member, id: 'member-2', status: status === 'failed' ? 'failed' : 'skipped', durationMs: 0, ...(status === 'failed' ? { error: reportError({ message: 'retry launch failed' }) } : {}) }] },
       ],
     };
     const xml = render(
