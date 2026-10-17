@@ -113,7 +113,7 @@ export interface SerialMemberRecord {
 }
 
 export interface SerialAttemptRecord {
-  /** Whether the runner kept the preceding attempt's member verdicts. */
+  /** Whether the runner kept the last non-cut attempt's member verdicts. */
   cutRetry?: boolean;
   id: string;
   index: number;

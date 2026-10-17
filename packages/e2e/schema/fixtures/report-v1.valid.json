@@ -94,7 +94,7 @@
             "cleanup": "complete"
           },
           {
-            "id": "018f0f5c-7b2a-7abc-8abc-0123456789ab",
+            "id": "018f0f5c-7b2a-7abc-8abc-0123456789ae",
             "index": 1,
             "cutRetry": true,
             "status": "failed",
@@ -102,7 +102,7 @@
             "durationMs": 0,
             "members": [
               {
-                "id": "018f0f5c-7b2a-7abc-8abc-0123456789ab",
+                "id": "018f0f5c-7b2a-7abc-8abc-0123456789af",
                 "index": 0,
                 "testId": "tests/example.e2e.ts::checkout::retains%20serial%20verdict",
                 "status": "failed",
@@ -211,10 +211,7 @@
                 },
                 "cache": {
                   "mode": "missed",
-                  "recordedBy": {
-                    "provider": "example",
-                    "model": "model-A"
-                  },
+                  "recordedBy": { "provider": "example", "model": "model-A" },
                   "reason": "gap",
                   "derived": "minted-token",
                   "replayedActions": 0,

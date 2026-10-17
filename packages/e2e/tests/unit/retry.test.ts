@@ -143,7 +143,6 @@ describe('retryVerdict', () => {
   });
 });
 
-
 describe('isCutSerialRetry', () => {
   it.each(['passed', 'failed', 'timed-out', 'interrupted'] as const)('keeps the first %s attempt even when it never reached members', (status) => {
     expect(isCutSerialRetry(status, 0, false)).toBe(false);

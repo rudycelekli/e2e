@@ -99,15 +99,14 @@ export interface SerialHost {
 /** The identity of a group attempt, known from its start. */
 export type SerialAttemptStart = Pick<SerialAttemptRecord, 'id' | 'index' | 'startedAt'>;
 
-/** One group attempt as it ended, and whether it got as far as its members. */
+/** One finished group attempt, including its retry verdict decision. */
 export interface SerialAttemptRun {
   readonly record: SerialAttemptRecord;
-  /**
-   * False when the attempt stopped before any member ran (its file would not
-   * load, its session would not launch). Such a retry keeps the members'
-   * verdicts from the attempt before it.
-   */
-  readonly reachedMembers: boolean;
+}
+
+/** Record the retry decision before this finished attempt is streamed or consumed. */
+function finishedSerialAttempt(record: SerialAttemptRecord, reachedMembers: boolean): SerialAttemptRun {
+  return { record: { ...record, cutRetry: isCutSerialRetry(record.status, record.index, reachedMembers) } };
 }
 
 /** The report id of one serial group variant: a group runs once per agent and per repeat. */
@@ -188,8 +187,7 @@ function memberResults(
   runs: readonly SerialAttemptRun[],
 ): ResultRecord[] {
   const verdicts = new Map<string, SerialMemberRecord>();
-  for (const [attemptIndex, run] of runs.entries()) {
-    run.record.cutRetry = isCutSerialRetry(run.record.status, attemptIndex, run.reachedMembers);
+  for (const run of runs) {
     if (!run.record.cutRetry) for (const member of run.record.members) verdicts.set(member.testId, member);
   }
   return members.map((member) => {
@@ -287,7 +285,7 @@ export class SerialGroupProgress {
       }
       const record = this.attemptInFlight('failed', error);
       endBeforeMembers(record, members, error, NEVER_INTERRUPTED);
-      return this.settled([...this.finished, { record, reachedMembers: false }], members, target);
+      return this.settled([...this.finished, finishedSerialAttempt(record, false)], members, target);
     }
     const next = this.currentMembers.length;
     const wasRunning = this.running !== undefined && this.running === members[next]?.test.id;
@@ -303,7 +301,7 @@ export class SerialGroupProgress {
           : skippedMember(record.id, memberIndex, member.test.id, skip),
       );
     }
-    return this.settled([...this.finished, { record, reachedMembers: true }], members, target);
+    return this.settled([...this.finished, finishedSerialAttempt(record, true)], members, target);
   }
 
   /**
@@ -319,7 +317,7 @@ export class SerialGroupProgress {
     for (const [memberIndex, member] of members.entries()) {
       if (memberIndex >= this.currentMembers.length) record.members.push(skippedMember(record.id, memberIndex, member.test.id, skip));
     }
-    return this.settled([...this.finished, { record, reachedMembers: true }], members, target);
+    return this.settled([...this.finished, finishedSerialAttempt(record, true)], members, target);
   }
 
   /** Whether a member of the attempt in flight started or finished. */
@@ -419,7 +417,7 @@ async function runSerialAttempt(
   } catch (cause) {
     endBeforeMembers(record, members, serializeError(classifyError(cause), { phase: 'collection' }), host.interruptSignal);
     record.durationMs = Date.now() - startedMs;
-    return { record, reachedMembers: false };
+    return finishedSerialAttempt(record, false);
   }
 
   let shared: SharedSerialSession;
@@ -436,7 +434,7 @@ async function runSerialAttempt(
     endBeforeMembers(record, members, serializeError(classifyError(cause), { phase: 'launch' }), host.interruptSignal);
     record.durationMs = Date.now() - startedMs;
     await host.realms.leave(realm);
-    return { record, reachedMembers: false };
+    return finishedSerialAttempt(record, false);
   }
 
   let skipRemaining: SkipInfo | undefined;
@@ -532,7 +530,7 @@ async function runSerialAttempt(
   await host.closeSession(shared.session, { attemptId, video: recordings.video }, record, artifacts.sink, record.secondaryErrors);
   await artifacts.settle();
   record.durationMs = Date.now() - startedMs;
-  return { record, reachedMembers: true };
+  return finishedSerialAttempt(record, true);
 }
 
 /**
