@@ -124,7 +124,14 @@ mobile({ platform: 'android' });
  * the platform at `prepare`, as many as the run has slots; with none booted,
  * agent-device boots one. A `DeviceProvider` leases hosted devices instead:
  * one per worker slot at `prepare`, each driven through the daemon and
- * client configuration the lease names, all released when the run ends.
+ * client configuration the lease names. A replacement worker resumes a
+ * healthy agent-device session on the same lease. Forced worker shutdown
+ * can close the session. `device.closeApp()` ends the session and drops
+ * the device claim during the run. If agent-device has not confirmed a
+ * recording stop, the engine resets the recording before the next
+ * attempt. This reset also closes the session and drops the claim.
+ * At run end, the engine closes the sessions and the provider releases
+ * its leases.
  */
 readonly device?: string | readonly string[] | DeviceProvider | undefined;
 ```
@@ -868,6 +875,26 @@ capture failure still stops the observation. Device screenshot masks depend
 on secure-field bounds from that capture, so without them the engine cannot
 prove a fallback screenshot safe.
 </Note>
+
+## Video recording cleanup
+
+A provider recording that fails to stop stays owned by its worker. The
+engine retries its stop at attempt end, before another attempt on that
+worker, and during worker disposal. A pending stop is shared. Each retry
+uses the original attempt's video directory.
+
+The next attempt starts only after the provider confirms the stop. A
+failed or cancelled stop wait prevents that attempt from starting.
+Confirmed stops are not repeated if the returned artifact is invalid.
+A failed provider stop alone does not close a healthy agent-device session
+during worker replacement.
+
+These recording handles do not survive worker exit. At run end, the engine
+closes its agent-device sessions and the provider releases its leases.
+Providers must clean up any remaining external recordings when releasing a
+lease. Closing an agent-device session cannot guarantee that an arbitrary
+cloud recording stops. A failed provider stop callback does not confirm that
+the recording stopped.
 
 ## Replay cache on a device
 
