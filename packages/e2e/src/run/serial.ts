@@ -93,20 +93,16 @@ export interface SerialHost {
    */
   serialMemberFinished(groupId: string, attempt: SerialAttemptStart, member: SerialMemberRecord): void;
   /** Streams one finished group attempt, for the same reason. */
-  serialAttemptFinished(groupId: string, run: SerialAttemptRun): void;
+  serialAttemptFinished(groupId: string, run: SerialAttemptRecord): void;
 }
 
 /** The identity of a group attempt, known from its start. */
 export type SerialAttemptStart = Pick<SerialAttemptRecord, 'id' | 'index' | 'startedAt'>;
 
-/** One finished group attempt, including its retry verdict decision. */
-export interface SerialAttemptRun {
-  readonly record: SerialAttemptRecord;
-}
-
-/** Record the retry decision before this finished attempt is streamed or consumed. */
-function finishedSerialAttempt(record: SerialAttemptRecord, reachedMembers: boolean): SerialAttemptRun {
-  return { record: { ...record, cutRetry: isCutSerialRetry(record.status, record.index, reachedMembers) } };
+/** Record the retry decision on a finished attempt before it is streamed or consumed. */
+function finishedSerialAttempt(record: SerialAttemptRecord, reachedMembers: boolean): SerialAttemptRecord {
+  record.cutRetry = isCutSerialRetry(record.status, record.index, reachedMembers);
+  return record;
 }
 
 /** The report id of one serial group variant: a group runs once per agent and per repeat. */
@@ -123,19 +119,19 @@ export async function runSerialUnit(
   file: FileRef,
 ): Promise<SerialGroupRecord> {
   const group = newSerialGroup(members, host.target);
-  const runs: SerialAttemptRun[] = [];
+  const runs: SerialAttemptRecord[] = [];
   const finalStatus = await runWithRetries(
     members[0]!.options.retries + 1,
     host.interruptSignal,
     async (attemptIndex) => {
       const run = await runSerialAttempt(host, group.id, members, file, attemptIndex);
       runs.push(run);
-      group.attempts.push(run.record);
+      group.attempts.push(run);
       host.serialAttemptFinished(group.id, run);
       // A beforeAll failure is not retry-eligible: the
       // attempt stands as recorded and the retry loop stops here.
-      if (run.record.error?.code === 'HOOK_FAILED') return undefined;
-      return run.record;
+      if (run.error?.code === 'HOOK_FAILED') return undefined;
+      return run;
     },
   );
 
@@ -146,9 +142,8 @@ export async function runSerialUnit(
     group.status = finalStatus;
   }
 
-  const results = memberResults(group, members, runs);
   host.emitSerialGroup(group);
-  for (const result of results) host.emit(result);
+  for (const result of memberResults(group, members, runs)) host.emit(result);
   return group;
 }
 
@@ -184,11 +179,11 @@ function newSerialGroup(members: readonly TestTargetPair[], target: ResolvedTarg
 function memberResults(
   group: SerialGroupRecord,
   members: readonly TestTargetPair[],
-  runs: readonly SerialAttemptRun[],
+  runs: readonly SerialAttemptRecord[],
 ): ResultRecord[] {
   const verdicts = new Map<string, SerialMemberRecord>();
   for (const run of runs) {
-    if (!run.record.cutRetry) for (const member of run.record.members) verdicts.set(member.testId, member);
+    if (!run.cutRetry) for (const member of run.members) verdicts.set(member.testId, member);
   }
   return members.map((member) => {
     const memberRecord = verdicts.get(member.test.id);
@@ -230,7 +225,7 @@ interface SettledSerialGroup {
  * what the report keeps.
  */
 export class SerialGroupProgress {
-  private readonly finished: SerialAttemptRun[] = [];
+  private readonly finished: SerialAttemptRecord[] = [];
   private current: SerialAttemptStart | undefined;
   private currentMembers: SerialMemberRecord[] = [];
   /** The member whose body is running now, by test id, until its record arrives. */
@@ -249,7 +244,7 @@ export class SerialGroupProgress {
   }
 
   /** A group attempt finished; the next one starts empty. */
-  attemptFinished(run: SerialAttemptRun): void {
+  attemptFinished(run: SerialAttemptRecord): void {
     this.finished.push(run);
     this.current = undefined;
     this.currentMembers = [];
@@ -276,11 +271,8 @@ export class SerialGroupProgress {
     const last = this.finished.at(-1);
     if (!this.inFlight) {
       if (last === undefined) return undefined;
-      if (!retryFollows(last.record, this.finished.length, members)) {
-        const closed: SerialAttemptRun = {
-          ...last,
-          record: { ...last.record, secondaryErrors: [...last.record.secondaryErrors, error], cleanup: 'forced' },
-        };
+      if (!retryFollows(last, this.finished.length, members)) {
+        const closed: SerialAttemptRecord = { ...last, secondaryErrors: [...last.secondaryErrors, error], cleanup: 'forced' };
         return this.settled([...this.finished.slice(0, -1), closed], members, target);
       }
       const record = this.attemptInFlight('failed', error);
@@ -329,6 +321,7 @@ export class SerialGroupProgress {
   private attemptInFlight(status: SerialAttemptRecord['status'], error: SerializedError | undefined): SerialAttemptRecord {
     return {
       id: this.current?.id ?? uuidv7(),
+      cutRetry: false,
       index: this.finished.length,
       status,
       startedAt: this.current?.startedAt ?? timestamp(),
@@ -342,13 +335,13 @@ export class SerialGroupProgress {
   }
 
   private settled(
-    runs: readonly SerialAttemptRun[],
+    runs: readonly SerialAttemptRecord[],
     members: readonly TestTargetPair[],
     target: ResolvedTarget,
   ): SettledSerialGroup {
     const group = newSerialGroup(members, target);
-    group.status = retryVerdict(runs.map((run) => run.record));
-    group.attempts = runs.map((run) => run.record);
+    group.status = retryVerdict(runs);
+    group.attempts = [...runs];
     return { group, results: memberResults(group, members, runs) };
   }
 }
@@ -370,7 +363,7 @@ async function runSerialAttempt(
   members: readonly TestTargetPair[],
   file: FileRef,
   attemptIndex: number,
-): Promise<SerialAttemptRun> {
+): Promise<SerialAttemptRecord> {
   const attemptId = uuidv7();
   const startedAt = timestamp();
   const startedMs = Date.now();
@@ -394,6 +387,7 @@ async function runSerialAttempt(
   });
   const record: SerialAttemptRecord = {
     id: attemptId,
+    cutRetry: false,
     index: attemptIndex,
     status: 'passed',
     startedAt,

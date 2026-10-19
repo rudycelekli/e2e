@@ -237,7 +237,7 @@ export interface ReportSerialMember {
 
 export interface ReportSerialAttempt extends ReportAttemptBase {
   status: SerialAttemptRecord['status'];
-  /** Whether the runner kept the last non-cut attempt's member verdicts. Absent in older reports. */
+  /** The retry was cut before it reached its members, so their verdicts come from an earlier attempt. Absent in older reports. */
   cutRetry?: boolean;
   members: readonly ReportSerialMember[];
 }
@@ -500,7 +500,7 @@ function serializeSerialAttempt(attempt: SerialAttemptRecord): ReportSerialAttem
   return {
     ...serializeAttemptBase(attempt),
     status: attempt.status,
-    ...(attempt.cutRetry === undefined ? {} : { cutRetry: attempt.cutRetry }),
+    cutRetry: attempt.cutRetry,
     members: attempt.members.map(serializeSerialMember),
   };
 }

@@ -113,9 +113,9 @@ export interface SerialMemberRecord {
 }
 
 export interface SerialAttemptRecord {
-  /** Whether the runner kept the last non-cut attempt's member verdicts. */
-  cutRetry?: boolean;
   id: string;
+  /** The retry was cut before it reached its members, so their verdicts come from an earlier attempt. */
+  cutRetry: boolean;
   index: number;
   status: 'passed' | 'failed' | 'timed-out' | 'interrupted';
   startedAt: string;

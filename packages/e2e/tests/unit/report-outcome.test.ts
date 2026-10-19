@@ -57,6 +57,4 @@ describe('serial verdict attempt', () => {
     expect(result.final.error).toBe(launchError);
     expect(result.attempts).toHaveLength(2);
   });
-
-
 });
