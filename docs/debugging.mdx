@@ -177,8 +177,8 @@ result holds:
 
 A serial group's tests have no `attempts` of their own. Their results are in
 `run.serialGroups`, one member for each test in each attempt. A retry with
-`cutRetry: true` was cut before it reached its members, so their verdicts come
-from the last attempt without it. Skip cut retries when inspecting the verdict:
+`cutRetry: true` does not supply member verdicts, even if some members ran.
+Use the last non-cut attempt when inspecting the verdict:
 
 ```bash
 jq '.run.serialGroups[] | (.attempts | map(select(.cutRetry != true)) | last).members[]? | select(.status != "passed")
