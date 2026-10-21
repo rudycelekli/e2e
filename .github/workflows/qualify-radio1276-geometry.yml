@@ -1,0 +1,63 @@
+name: Native radio1276 interactive label geometry
+'on':
+  workflow_dispatch: {}
+  push:
+    branches:
+    - validation-radio1276-geometry-20261020
+permissions:
+  contents: read
+jobs:
+  baseline:
+    if: github.repository == 'rudycelekli/e2e' && github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      E2E_TELEMETRY_DISABLED: '1'
+      DO_NOT_TRACK: '1'
+      CI: 'true'
+    steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        repository: tester-army/e2e
+        ref: 1568435e5456b274e038ad8673d09978bb4a90c8
+        persist-credentials: false
+    - name: Guard frozen production and save identity
+      run: |
+        test "$(git rev-parse HEAD)" = 1568435e5456b274e038ad8673d09978bb4a90c8
+        git diff --exit-code
+        python3 - "$RUNNER_TEMP/source.json" save <<'PYTHON'
+        import hashlib,json,subprocess,pathlib,sys
+        paths=subprocess.check_output(['git','ls-files','-z']).split(b'\0')
+        identity={p.decode():hashlib.sha256(pathlib.Path(p.decode()).read_bytes()).hexdigest() for p in paths if p and pathlib.Path(p.decode()).is_file()}
+        path=pathlib.Path(sys.argv[1])
+        if sys.argv[2]=='save':path.write_text(json.dumps(identity,sort_keys=True))
+        else:assert identity==json.loads(path.read_text())
+        PYTHON
+    - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
+      with:
+        version: 12.3.4
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+      with:
+        node-version: 26
+    - name: Install frozen dependencies and native Chromium only
+      run: |
+        pnpm install --frozen-lockfile
+        pnpm --filter @e2e-dev/web exec playwright-core install --with-deps chromium
+      id: build
+    - name: Diagnose original and explicit covering fixture geometry
+      working-directory: packages/web
+      run: |
+        python3 - <<'PYTHON'
+        import base64,pathlib
+        pathlib.Path('geometry1276.mjs').write_bytes(base64.b64decode('aW1wb3J0IHsgY2hyb21pdW0gfSBmcm9tICdwbGF5d3JpZ2h0LWNvcmUnOwppbXBvcnQgeyB3cml0ZUZpbGUgfSBmcm9tICdub2RlOmZzL3Byb21pc2VzJzsKY29uc3QgYnJvd3Nlcj1hd2FpdCBjaHJvbWl1bS5sYXVuY2goKTtjb25zdCByZXN1bHRzPVtdOwp0cnkgewogZm9yKGNvbnN0IGNvdmVyZWQgb2YgW2ZhbHNlLHRydWVdKXsKICBjb25zdCBwYWdlPWF3YWl0IGJyb3dzZXIubmV3UGFnZSgpOwogIGF3YWl0IHBhZ2Uuc2V0Q29udGVudChgPHN0eWxlPi5jb250cm9sIHtwb3NpdGlvbjpyZWxhdGl2ZTtkaXNwbGF5OmlubGluZS1ibG9jazt3aWR0aDoxNjBweDtoZWlnaHQ6NDBweH0uY29udHJvbCBpbnB1dCB7cG9zaXRpb246YWJzb2x1dGU7aW5zZXQ6MDttYXJnaW46MDt3aWR0aDoxMDAlO2hlaWdodDoxMDAlO29wYWNpdHk6MH0uY29udHJvbCBzcGFuIHtwb3NpdGlvbjpyZWxhdGl2ZTtkaXNwbGF5OmJsb2NrO3dpZHRoOjEwMCU7aGVpZ2h0OjEwMCU7YmFja2dyb3VuZDpsaWdodGdyYXl9PC9zdHlsZT48bGFiZWwgY2xhc3M9ImNvbnRyb2wiPjxpbnB1dCB0eXBlPSJjaGVja2JveCIgaWQ9ImJveCI+PGEgaHJlZj0iI3VuZXhwZWN0ZWQiIHN0eWxlPSJkaXNwbGF5OmJsb2NrO3dpZHRoOjEwMCU7aGVpZ2h0OjEwMCU7JHtjb3ZlcmVkPydwb3NpdGlvbjpyZWxhdGl2ZTt6LWluZGV4OjI7JzonJ30iPkhlbHA8L2E+PC9sYWJlbD48c2NyaXB0PndpbmRvdy5jb3VudHM9e2lucHV0OjAsYW5jaG9yOjB9O2RvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoJ2lucHV0JykuYWRkRXZlbnRMaXN0ZW5lcignY2xpY2snLCgpPT5jb3VudHMuaW5wdXQrKyk7ZG9jdW1lbnQucXVlcnlTZWxlY3RvcignYScpLmFkZEV2ZW50TGlzdGVuZXIoJ2NsaWNrJywoKT0+Y291bnRzLmFuY2hvcisrKTs8L3NjcmlwdD5gKTsKICBjb25zdCBiZWZvcmU9YXdhaXQgcGFnZS5ldmFsdWF0ZSgoKT0+ewogICBjb25zdCBpbnB1dD1kb2N1bWVudC5xdWVyeVNlbGVjdG9yKCdpbnB1dCcpLGxhYmVsPWRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoJ2xhYmVsJyksYW5jaG9yPWRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoJ2EnKTsKICAgY29uc3QgaGl0PW5vZGU9Pntjb25zdCByPW5vZGUuZ2V0Qm91bmRpbmdDbGllbnRSZWN0KCk7Y29uc3QgaD1kb2N1bWVudC5lbGVtZW50RnJvbVBvaW50KHIueCtyLndpZHRoLzIsci55K3IuaGVpZ2h0LzIpO3JldHVybiB7dGFnOmg/LnRhZ05hbWUsaWQ6aD8uaWQscG9zaXRpb246Z2V0Q29tcHV0ZWRTdHlsZShub2RlKS5wb3NpdGlvbix6SW5kZXg6Z2V0Q29tcHV0ZWRTdHlsZShub2RlKS56SW5kZXh9O307CiAgIHJldHVybiB7aW5wdXRDZW50ZXI6aGl0KGlucHV0KSxsYWJlbENlbnRlcjpoaXQobGFiZWwpLGFuY2hvclN0eWxlOntwb3NpdGlvbjpnZXRDb21wdXRlZFN0eWxlKGFuY2hvcikucG9zaXRpb24sekluZGV4OmdldENvbXB1dGVkU3R5bGUoYW5jaG9yKS56SW5kZXh9fTsKICB9KTsKICBsZXQgZmFpbHVyZTt0cnl7YXdhaXQgcGFnZS5sb2NhdG9yKCcjYm94JykuY2xpY2soe3RpbWVvdXQ6MTAwMH0pO31jYXRjaChlKXtmYWlsdXJlPVN0cmluZyhlKTt9CiAgY29uc3QgYWZ0ZXI9YXdhaXQgcGFnZS5ldmFsdWF0ZSgoKT0+KHtjb3VudHM6d2luZG93LmNvdW50cyxjaGVja2VkOmRvY3VtZW50LnF1ZXJ5U2VsZWN0b3IoJ2lucHV0JykuY2hlY2tlZCxoYXNoOmxvY2F0aW9uLmhhc2h9KSk7CiAgcmVzdWx0cy5wdXNoKHtjb3ZlcmVkLGJlZm9yZSxhZnRlcixmYWlsdXJlfSk7YXdhaXQgcGFnZS5jbG9zZSgpOwogfQp9ZmluYWxseXthd2FpdCBicm93c2VyLmNsb3NlKCk7fQphd2FpdCB3cml0ZUZpbGUocHJvY2Vzcy5lbnYuR0VPTUVUUllfT1VUUFVULEpTT04uc3RyaW5naWZ5KHJlc3VsdHMsbnVsbCwyKSk7CmNvbnN0IFtvcmlnaW5hbCxjb3JyZWN0ZWRdPXJlc3VsdHM7CmlmKG9yaWdpbmFsLmJlZm9yZS5pbnB1dENlbnRlci50YWchPT0nSU5QVVQnfHxvcmlnaW5hbC5iZWZvcmUubGFiZWxDZW50ZXIudGFnIT09J0lOUFVUJ3x8b3JpZ2luYWwuYWZ0ZXIuY291bnRzLmlucHV0IT09MXx8b3JpZ2luYWwuYWZ0ZXIuY291bnRzLmFuY2hvciE9PTB8fG9yaWdpbmFsLmFmdGVyLmNoZWNrZWQhPT10cnVlfHxvcmlnaW5hbC5mYWlsdXJlKXRocm93IEVycm9yKCdPcmlnaW5hbCBmaXh0dXJlIGdlb21ldHJ5IGh5cG90aGVzaXMgbm90IHByb3ZlbicpOwppZihjb3JyZWN0ZWQuYmVmb3JlLmlucHV0Q2VudGVyLnRhZyE9PSdBJ3x8Y29ycmVjdGVkLmJlZm9yZS5sYWJlbENlbnRlci50YWchPT0nQSd8fGNvcnJlY3RlZC5hZnRlci5jb3VudHMuaW5wdXQhPT0wfHxjb3JyZWN0ZWQuYWZ0ZXIuY291bnRzLmFuY2hvciE9PTB8fGNvcnJlY3RlZC5hZnRlci5jaGVja2VkIT09ZmFsc2V8fCFjb3JyZWN0ZWQuZmFpbHVyZT8uaW5jbHVkZXMoJ2ludGVyY2VwdHMgcG9pbnRlciBldmVudHMnKSl0aHJvdyBFcnJvcignRXhwbGljaXQgaW50ZXJhY3RpdmUgY292ZXIgbm90IGVzdGFibGlzaGVkJyk7Cg=='))
+        PYTHON
+        GEOMETRY_OUTPUT="$RUNNER_TEMP/geometry1276.json" node geometry1276.mjs
+        git diff --exit-code
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      if: always()
+      with:
+        name: geometry1276
+        path: |-
+          ${{ runner.temp }}/geometry1276.json
+          ${{ runner.temp }}/source.json
+        retention-days: 7
