@@ -83,7 +83,7 @@ test('a member upgrades to Pro', async ({ app, agent, screen, browser }) => {
 
 ## Workflow: writing a test
 
-1. Look at what exists: `e2e.config.ts` or `e2e.config.mts`, the `tests` glob
+1. Look at what exists: `e2e.config.ts`, `.mts`, `.js`, or `.mjs`, the `tests` glob
    (default `tests/**/*.e2e.ts`), `e2e` in `package.json`. Nothing there:
    follow `setup` when the user has requested e2e (see Rules).
 2. Learn the screens before writing a test: routes, labels, roles, button
@@ -158,8 +158,8 @@ you worked around it or gave up. Never report:
 
 - failures of the app under test, or its own behavior;
 - a problem you saw once and could not see again;
-- anything on an outdated e2e: the command refuses it, so upgrade and check
-  the problem still happens first.
+- anything on an outdated e2e: the command refuses it, so upgrade
+  (`npx e2e@latest upgrade`) and check the problem still happens first.
 
 Search [existing issues](https://github.com/tester-army/e2e/issues) first
 (`gh issue list -R tester-army/e2e --search "<words>"`); comment on a match

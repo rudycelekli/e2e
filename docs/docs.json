@@ -135,7 +135,8 @@
               "quickstart",
               "core-concepts",
               "coding-agents",
-              "mcp"
+              "mcp-server",
+              "ci"
             ]
           },
           {
@@ -168,7 +169,6 @@
           {
             "group": "Run in CI",
             "pages": [
-              "ci",
               "ci/github-actions",
               "ci/eas-workflows",
               "ci/bitrise",

@@ -35,8 +35,11 @@ suites that consume the built packages the way a user would.
 
 - `packages/e2e` — the published `e2e` package: SDK surface, runner, CLI,
   `e2e/engine` contract. Core knows the contract and never an engine's
-  internals: no `Web`, `browser`, `page`, `route`, or `playwright` noun lives in
-  `src/` (grep for them; zero hits is the invariant). The one exception is the
+  internals: no engine package is imported from `src/` (grep for
+  `from '@e2e-dev/` and `import('@e2e-dev/`; the presets below are the only
+  hits). Engine words still appear as platform labels, capability names, and in
+  error text that names a factory, such as `config/targets.ts` telling you to
+  call `web()`; no path through them reaches engine code. The one exception is the
   `e2e init` scaffold presets in `src/cli/init/engines.ts`, which write the
   user's config and so name engine packages as text; the package build records
   the sibling packages' versions in `dist/cli/init/sibling-versions.json` for the
@@ -167,9 +170,14 @@ suites that consume the built packages the way a user would.
   `with-compose`, `with-kotlin-multiplatform`, `with-flutter`, `with-maui`), each the same
   one-screen greeter demo with deterministic and agent tests. They install
   the published packages from npm, sit outside the pnpm workspace, commit no
-  lockfile, and run in no CI; oxlint and fallow ignore them. A change runs
-  the example's suite by hand and updates the "Last checked" line in its
-  README. A native, Flutter, or .NET MAUI example (SwiftUI, Compose, Kotlin
+  lockfile, and gate no pull request; oxlint and fallow ignore them.
+  `.github/workflows/examples.yml` runs every one but `with-limrun` nightly
+  (23:00 Europe/Warsaw) on each platform it supports, with the packages
+  packed from main swapped in for the npm ones, agent tests included, and
+  posts one Slack message for the run (`scripts/examples-nightly/`, the
+  `SLACK_EXAMPLES_NIGHTLY_WEBHOOK_URL` secret). A new example or platform
+  gets a matrix entry there. A change still runs the example's suite by hand and updates the
+  "Last checked" line in its README. A native, Flutter, or .NET MAUI example (SwiftUI, Compose, Kotlin
   Multiplatform, Flutter, .NET MAUI) keeps its tests in an `e2e/` folder
   beside the native project, as a user would.
 - `docs/` (the Mintlify docs site; pages are the `.mdx` files under `docs/`,
@@ -245,7 +253,7 @@ suites that consume the built packages the way a user would.
 Build first — nearly everything downstream consumes `dist`.
 
 ```bash
-pnpm check          # lint -> check:dead-code -> typecheck -> docs:check-errors -> check:peer-ranges -> check:install-scripts -> plugins:check -> mcp-server:check -> docs:check (full gate)
+pnpm check          # lint -> check:dead-code -> typecheck -> docs:check-errors -> check:peer-ranges -> check:changeset-bumps -> check:install-scripts -> plugins:check -> mcp-server:check -> docs:check (full gate)
 pnpm test           # builds, then vitest unit + integration
 pnpm test:testbed   # builds, then runs the real CLI against the playground app
 pnpm test:web-benchmark   # builds, then runs the real CLI against the benchmark scenarios
@@ -569,7 +577,7 @@ trees, on both platforms, without a device.
   checks the docs. All four run on pull requests and in the merge queue
   (`merge_group`), which is the merge gate: auto-merge enqueues, and the
   queue merges only when every check is green on the queued tree. Each
-  workflow ends in a `<workflow> gate` job, the only checks the `Main`
+  of the four ends in a `<workflow> gate` job, the only checks the `Main`
   ruleset requires (`spec gate`, `benchmark gate`, `mobile gate`, `docs
   gate`); it fails when any job it needs failed or was cancelled and passes
   over a skipped one, so a new job gates merges once it is in its gate's
