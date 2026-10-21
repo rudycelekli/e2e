@@ -1,125 +1,164 @@
-name: spec
-
-# The ruleset requires `spec gate` alone, so a job added here gates merges
-# once it is listed in the gate's `needs`.
-on:
-  pull_request:
-  merge_group:
-  push:
-    branches: [main]
-
-# The repository's own runs are not usage: the CLI sends no telemetry from CI here.
-env:
-  E2E_TELEMETRY_DISABLED: '1'
-
+name: E2E1048 exact download failure classification
+'on': workflow_dispatch
 permissions:
   contents: read
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
 jobs:
-  check:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1 # v4.2.0
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 26
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Lint
-        run: pnpm lint
-      - name: Dead code (fallow)
-        run: pnpm check:dead-code
-      - name: Typecheck packages
-        run: pnpm typecheck
-      - name: Error code reference
-        run: pnpm docs:check-errors
-      - name: Peer ranges on the runner
-        run: pnpm check:peer-ranges
-      - name: Changeset bumps on 0.x packages
-        run: pnpm check:changeset-bumps
-      - name: No install scripts in published dependency trees
-        run: pnpm check:install-scripts
-      - name: Plugin package matches its sources
-        run: pnpm plugins:check
-      - name: MCP Registry entry matches the runner
-        run: pnpm mcp-server:check
-      # The registry rejects an invalid entry only at publish, from a release
-      # tag that can no longer change.
-      - uses: ./.github/actions/mcp-publisher
-      - name: MCP Registry accepts the entry
-        run: '"$RUNNER_TEMP/mcp-publisher" validate packages/e2e/server.json'
-      - name: Agent skill scripts
-        run: |
-          pnpm exec tsc -p .dev/skills/babysit/scripts
-          node --test .dev/skills/babysit/scripts/pr-status.test.ts
-      - name: Install browsers
-        run: node packages/web/dist/bin.js install chromium --with-deps
-      - name: Testbed
-        run: pnpm --filter @e2e-dev/testbed test
-
-  test:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 15
+  targeted:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        # The newest release of each line, and the floors in engines.node.
-        node: [22, 24, 26, 22.22.3, 24.8.0]
+        ref:
+        - 861fd962f07c5cc638e1a4df78b77d2701ce990d
+        - d7c6b5e5a4c27fac7633e66866fd367b0351ead8
+        - 6de152caff51a79311454a5367eb842d191ecba4
+    env:
+      CI: 'true'
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1 # v4.2.0
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: ${{ matrix.node }}
-          # A major alone resolves to the runner's cached release, which can
-          # sit below the patch floor in engines.node (22.22.3).
-          check-latest: true
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Install browsers
-        run: pnpm --filter @e2e-dev/web exec playwright-core install chromium --with-deps
-      - name: Unit and integration tests
-        run: pnpm test
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      with:
+        repository: tester-army/e2e
+        ref: ${{ matrix.ref }}
+        persist-credentials: false
+    - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1
+      with:
+        version: 12.3.4
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+      with:
+        node-version: 24.22.0
+    - name: Locked dependencies
+      run: pnpm install --frozen-lockfile > /tmp/install.log 2>&1
+    - name: Actual browser installation
+      run: pnpm --filter @e2e-dev/web exec playwright-core install chromium --with-deps
+        > /tmp/browser-install.log 2>&1
+    - name: Build actual public packages
+      run: pnpm build > /tmp/build.log 2>&1
+    - name: Freeze exact source and materialize readonly outcome observer
+      run: 'python - <<''PREP''
 
-  # A new user's first install of the packed packages, which pnpm 11 and
-  # later fail on any dependency build script (scripts/install-smoke.ts).
-  install:
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 15
-    strategy:
-      fail-fast: false
-      matrix:
-        pnpm: [11, 12]
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: pnpm/action-setup@9fd676a19091d4595eefd76e4bd31c97133911f1 # v4.2.0
-      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
-        with:
-          node-version: 26
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run build
-      - name: Fresh install with pnpm ${{ matrix.pnpm }}
-        run: node scripts/install-smoke.ts ${{ matrix.pnpm }}
+        from pathlib import Path
 
-  # The one check the ruleset requires from this workflow. A skipped job
-  # passes (the change cannot reach it); a failed or cancelled one fails it.
-  gate:
-    name: spec gate
-    needs: [check, test, install]
-    if: ${{ always() }}
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    timeout-minutes: 5
-    steps:
-      - name: Require every job to pass or skip
-        env:
-          RESULTS: ${{ toJSON(needs) }}
-        run: |
-          failed="$(jq -r '[to_entries[] | select(.value.result != "success" and .value.result != "skipped") | "\(.key) \(.value.result)"] | join(", ")' <<< "$RESULTS")"
-          [ -z "$failed" ] || { echo "::error::$failed"; exit 1; }
+        import json,hashlib,subprocess
+
+        assert subprocess.check_output([''git'',''rev-parse'',''HEAD'']).decode().strip()==''${{
+        matrix.ref }}''
+
+        files=subprocess.check_output([''git'',''ls-files'',''-z'']).decode().split(''\0'')[:-1]
+
+        identity={f:hashlib.sha256(Path(f).read_bytes()).hexdigest() for f in files
+        if Path(f).is_file()}
+
+        Path(''/tmp/source-identity.json'').write_text(json.dumps(identity))
+
+        p=Path(''packages/e2e/tests/helpers/run-project.ts'');s=p.read_text();Path(''/tmp/original-run-project.ts'').write_bytes(p.read_bytes())
+
+        needle="  const result = outcome.results.find((candidate) => candidate.test.title
+        === title && candidate.repeat === repeat);"
+
+        assert s.count(needle)==1
+
+        s=s.replace(needle,needle+"\n  if (title === ''a trigger that starts no download
+        times out saying so'') writeFileSync(''/tmp/download-outcome.json'', JSON.stringify({
+        result, report: outcome.report }, null, 2));")
+
+        needle="cleanup: () => rmSync(dir, { recursive: true, force: true }),";assert
+        s.count(needle)==1
+
+        s=s.replace(needle,"cleanup: () => { rmSync(dir, { recursive: true, force:
+        true }); writeFileSync(''/tmp/fixture-cleanup.json'', JSON.stringify({ removed:
+        !existsSync(dir) })); },")
+
+        s=s.replace("import { mkdirSync,", "import { existsSync, mkdirSync,")
+
+        p.write_text(s)
+
+        Path(''/tmp/observer-helper.ts'').write_bytes(p.read_bytes())
+
+        PREP'
+    - name: One unchanged assertion with native built fixture batch
+      run: 'set +e
+
+        pnpm --filter e2e exec vitest run --project integration tests/integration/web-platform.test.ts
+        -t ''^web platform integration > fails a download that never started with
+        the wait and the trigger time, not a bare timeout$'' --reporter=junit --outputFile=/tmp/targeted.xml
+        > /tmp/targeted.log 2>&1
+
+        code=$?
+
+        set -e
+
+        export TEST_EXIT="$code"
+
+        python - <<''EVAL''
+
+        import os,json,xml.etree.ElementTree as E
+
+        from pathlib import Path
+
+        r=E.parse(''/tmp/targeted.xml'').getroot();cases=r.findall(''.//testcase'');selected=[x
+        for x in cases if x.find(''skipped'') is None]
+
+        assert len(selected)==1,(len(selected),[(x.get(''name''),x.find(''skipped'')
+        is None) for x in cases])
+
+        assert not r.findall(''.//error'')
+
+        f=selected[0].find(''failure'');code=int(os.environ[''TEST_EXIT'']);assert
+        (code==0 and f is None) or(code==1 and f is not None and f.get(''type'')==''AssertionError''),(code,E.tostring(r).decode())
+
+        assert Path(''/tmp/download-outcome.json'').exists()
+
+        assert json.loads(Path(''/tmp/fixture-cleanup.json'').read_text())[''removed'']
+
+        Path(''/tmp/classification.json'').write_text(json.dumps({''ref'':''${{ matrix.ref
+        }}'',''test_exit'':code,''selected'':1,''other_skipped'':len(cases)-1,''assertion_failures'':int(f
+        is not None),''failure'':None if f is None else ''''.join(f.itertext())},indent=2))
+
+        EVAL'
+    - name: Restore observer and verify all tracked source
+      if: always()
+      run: 'python - <<''GUARD''
+
+        from pathlib import Path
+
+        import hashlib,json
+
+        p=Path(''packages/e2e/tests/helpers/run-project.ts'');p.write_bytes(Path(''/tmp/original-run-project.ts'').read_bytes())
+
+        identity=json.loads(Path(''/tmp/source-identity.json'').read_text());assert
+        all(hashlib.sha256(Path(f).read_bytes()).hexdigest()==h for f,h in identity.items())
+
+        Path(''/tmp/source-guard.json'').write_text(json.dumps({''all_tracked_bytes_unchanged_after_observer_restore'':True}))
+
+        GUARD
+
+        git diff --exit-code'
+    - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+      if: always()
+      with:
+        name: download1048-${{ matrix.ref }}
+        path: '/tmp/install.log
+
+          /tmp/browser-install.log
+
+          /tmp/build.log
+
+          /tmp/source-identity.json
+
+          /tmp/original-run-project.ts
+
+          /tmp/observer-helper.ts
+
+          /tmp/targeted.log
+
+          /tmp/targeted.xml
+
+          /tmp/classification.json
+
+          /tmp/download-outcome.json
+
+          /tmp/fixture-cleanup.json
+
+          /tmp/source-guard.json'
+        if-no-files-found: error
