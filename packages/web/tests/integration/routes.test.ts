@@ -72,6 +72,7 @@ describe('browser.route decisions', () => {
   const projectRoot = mkdtempSync(path.join(tmpdir(), 'e2e-routes-'));
   const signal = new AbortController().signal;
   const hits = new Map<string, number>();
+  const attached: string[] = [];
   let server: Server;
   let origin: string;
   let otherSite: string;
@@ -100,6 +101,7 @@ describe('browser.route decisions', () => {
 
   beforeEach(async () => {
     hits.clear();
+    attached.length = 0;
     await surface.startAttempt({ attemptId: 'routes', artifactsDir: projectRoot, signal, resolveSecret: noSecrets, ...ignoreTrace });
     page = await surface.ensurePage();
     await page.goto(`${origin}/`);
@@ -108,6 +110,7 @@ describe('browser.route decisions', () => {
       operation: (timeoutMs = 5_000) => ({ signal, timeoutMs, runId: 'routes', attemptId: 'routes', origin: 'test' }),
       expectable: (target: object) => target,
       fixture: (_name: string, target: object) => target,
+      attachArtifact: (_kind: string, relative: string) => attached.push(relative),
     } as unknown as EngineFixtureContext);
   });
 
@@ -184,6 +187,47 @@ describe('browser.route decisions', () => {
       expect((page as unknown as EventEmitter).listenerCount('download')).toBe(baseline);
     } finally {
       clearTimeout(timer);
+      server.closeAllConnections();
+      await download?.cancel();
+      await work.catch(() => undefined);
+    }
+  });
+
+  it.each(['waitForDownload', 'waitForDownloads'] as const)('%s closes started downloads while its trigger is still pending', async (method) => {
+    await page.evaluate(() => {
+      const link = document.createElement('a');
+      link.href = '/stream-download';
+      link.textContent = 'Pending';
+      document.body.append(link);
+    });
+    const listeners = (page as unknown as EventEmitter).listenerCount('download');
+    let download: Download | undefined;
+    page.once('download', (value) => { download = value; });
+    let release!: () => void;
+    const pending = new Promise<void>((resolve) => { release = resolve; });
+    const trigger = async (): Promise<void> => {
+      await page.evaluate(() => document.querySelector<HTMLAnchorElement>('a')!.click());
+      await pending;
+    };
+    const work = method === 'waitForDownload'
+      ? browser.waitForDownload(trigger, { timeout: 500 })
+      : browser.waitForDownloads(trigger, { count: 1, timeout: 500 });
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      const result = await Promise.race([
+        work.then(() => 'completed', (cause: unknown) => cause),
+        new Promise((resolve) => { timer = setTimeout(() => resolve('still pending'), 1500); }),
+      ]);
+      expect(result).toMatchObject({ code: 'ACTION_FAILED' });
+      expect(download).toBeDefined();
+      expect((page as unknown as EventEmitter).listenerCount('download')).toBe(listeners);
+      expect(await download!.failure()).toMatch(/cancel/);
+      release();
+      await work.catch(() => undefined);
+      expect(attached).toEqual([]);
+    } finally {
+      clearTimeout(timer);
+      release();
       server.closeAllConnections();
       await download?.cancel();
       await work.catch(() => undefined);

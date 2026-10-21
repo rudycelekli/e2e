@@ -318,30 +318,49 @@ async function collectDownloads(
   trigger: () => Promise<void>,
   count: number,
   timeout: number | undefined,
+  api: 'browser.waitForDownload' | 'browser.waitForDownloads',
 ): Promise<DownloadedFile[]> {
+  if (timeout !== undefined && (!Number.isFinite(timeout) || timeout <= 0)) {
+    throw new TestError('INVALID_ARGUMENT', `${api} timeout must be positive and finite`);
+  }
+  const operation = context.operation(timeout);
+  const waitMs = operation.timeoutMs;
+  const deadline = new Deadline(waitMs);
+  const saving = new AbortController();
+  const signal = AbortSignal.any([operation.signal, saving.signal]);
+  const started: Download[] = [];
   let triggerFailure: { cause: unknown } | undefined;
-  return surface.guard(context.operation(timeout), 'download', async (currentOperation) => {
-    const waitMs = currentOperation.timeoutMs;
-    const deadline = new Deadline(waitMs);
-    const saving = new AbortController();
-    const signal = AbortSignal.any([currentOperation.signal, saving.signal]);
-    const page = surface.requirePage();
-    const remote = surface.remoteDownloads();
-    if (remote !== undefined) await saveDownloadsTo(page, remote.dir);
-    const started: Download[] = [];
-    let allStarted!: () => void;
-    const received = new Promise<void>((resolve) => { allStarted = resolve; });
-    const onDownload = (download: Download): void => {
-      if (started.length === count) return;
-      started.push(download);
-      if (started.length === count) allStarted();
-    };
-    const stopListening = (): void => { page.off('download', onDownload); };
-    page.on('download', onDownload);
-    // The trigger may outlive the budget; no download it starts later is collected.
-    const listening = setTimeout(stopListening, deadline.remaining());
-    let finished = false;
-    try {
+  let triggerMs: number | undefined;
+  let closed = false;
+  let finished = false;
+  let stopListening = (): void => {};
+  const timedOut = (): TestError => new TestError(
+    'ACTION_FAILED',
+    triggerMs === undefined
+      ? `${api} exceeded its timeout of ${waitMs}ms`
+      : started.length < count
+        ? `${count === 1 ? 'no download' : `${started.length} of ${count} downloads`} started within ${waitMs}ms; the trigger resolved after ${triggerMs}ms`
+        : `${count === 1 ? 'the download' : `${count} downloads`} did not finish within ${waitMs}ms`,
+  );
+  const requireOpen = (): void => {
+    if (closed || deadline.expired()) throw timedOut();
+  };
+  try {
+    return await withTimeout(surface.guard({ ...operation, signal }, 'download', async (currentOperation) => {
+      requireOpen();
+      const page = surface.requirePage();
+      const remote = surface.remoteDownloads();
+      if (remote !== undefined) await saveDownloadsTo(page, remote.dir, currentOperation.signal);
+      requireOpen();
+      let allStarted!: () => void;
+      const received = new Promise<void>((resolve) => { allStarted = resolve; });
+      const onDownload = (download: Download): void => {
+        if (closed || started.length === count) return;
+        started.push(download);
+        if (started.length === count) allStarted();
+      };
+      stopListening = () => { page.off('download', onDownload); };
+      page.on('download', onDownload);
       const triggerStart = Date.now();
       try {
         await trigger();
@@ -349,44 +368,38 @@ async function collectDownloads(
         triggerFailure = { cause };
         throw cause;
       }
-      const triggerMs = Date.now() - triggerStart;
-      await raceAbort(withTimeout(received, deadline.remaining(), () => new TestError(
-        'ACTION_FAILED',
-        `${count === 1 ? 'no download' : `${started.length} of ${count} downloads`} started within ${waitMs}ms; the trigger resolved after ${triggerMs}ms`,
-      )), currentOperation.signal, 'download');
-      const unfinished = (): TestError => new TestError(
-        'ACTION_FAILED',
-        `${count === 1 ? 'the download' : `${count} downloads`} did not finish within ${waitMs}ms`,
-      );
-      const save = async (): Promise<DownloadedFile[]> => {
-        const files: DownloadedFile[] = [];
-        for (const download of started) {
-          const suggestedFilename = download.suggestedFilename();
-          const { relative, absolute } = surface.artifactPath('downloads', suggestedFilename, '');
-          if (remote === undefined) await saveLocally(download, absolute, surface.unservedDownloads());
-          else await saveFromBrowser(download, remote, absolute, signal);
-          if (signal.aborted) throw unfinished();
-          context.attachArtifact('download', relative);
-          files.push({ path: relative, absolutePath: absolute, suggestedFilename });
-        }
-        return files;
-      };
-      const files = await raceAbort(withTimeout(save(), deadline.remaining(), unfinished), currentOperation.signal, 'download');
+      triggerMs = Date.now() - triggerStart;
+      requireOpen();
+      await raceAbort(received, currentOperation.signal, 'download');
+      requireOpen();
+      const files: DownloadedFile[] = [];
+      for (const download of started) {
+        requireOpen();
+        const suggestedFilename = download.suggestedFilename();
+        const { relative, absolute } = surface.artifactPath('downloads', suggestedFilename, '');
+        if (remote === undefined) await saveLocally(download, absolute, surface.unservedDownloads());
+        else await saveFromBrowser(download, remote, absolute, currentOperation.signal);
+        requireOpen();
+        if (currentOperation.signal.aborted) throw timedOut();
+        context.attachArtifact('download', relative);
+        files.push({ path: relative, absolutePath: absolute, suggestedFilename });
+      }
       finished = true;
       return files;
-    } finally {
-      clearTimeout(listening);
-      stopListening();
-      if (!finished) {
-        saving.abort();
-        for (const download of started) void download.cancel().catch(() => undefined);
-      }
+    }, (cause, label) => {
+      // The trigger is test code, so its errors keep their original classification.
+      if (triggerFailure !== undefined && Object.is(cause, triggerFailure.cause)) throw cause;
+      return translatePwError(cause, label);
+    }, 'test-code'), deadline.remaining(), timedOut);
+  } finally {
+    // The owner closes even when a trigger never settles; late work cannot attach artifacts.
+    closed = true;
+    stopListening();
+    if (!finished) {
+      saving.abort();
+      for (const download of started) void download.cancel().catch(() => undefined);
     }
-  }, (cause, label) => {
-    // The trigger is test code, so its errors keep their original classification.
-    if (triggerFailure !== undefined && Object.is(cause, triggerFailure.cause)) throw cause;
-    return translatePwError(cause, label);
-  }, 'test-code');
+  }
 }
 
 /** Builds the `browser` fixture for one attempt over the shared surface. */
@@ -696,7 +709,7 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
       return async () => unsubscribe();
     },
     async waitForDownload(trigger, options) {
-      const [file] = await collectDownloads(surface, context, trigger, 1, options?.timeout);
+      const [file] = await collectDownloads(surface, context, trigger, 1, options?.timeout, 'browser.waitForDownload');
       return file!;
     },
     async waitForDownloads(trigger, options) {
@@ -705,7 +718,7 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
       if (!Number.isSafeInteger(count) || count < 1) {
         throw new TestError('INVALID_ARGUMENT', 'waitForDownloads: count must be a positive safe integer');
       }
-      return collectDownloads(surface, context, trigger, count, options.timeout);
+      return collectDownloads(surface, context, trigger, count, options.timeout, 'browser.waitForDownloads');
     },
     keyboard: {
       down: (key) =>
@@ -754,8 +767,8 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
     setViewport: action,
     emulateMedia: { ...action, label: (media) => mediaLabel(media) },
     onDialog: action,
-    waitForDownload: { ...action, timeout: (_trigger, options) => options?.timeout },
-    waitForDownloads: { ...action, timeout: (_trigger, options) => options?.timeout },
+    waitForDownload: { ...action, timeout: false },
+    waitForDownloads: { ...action, timeout: false },
     keyboard: { down: { ...action, label: (key) => key }, up: { ...action, label: (key) => key }, press: { ...action, label: (key) => key }, type: { ...action, label: (text) => `${text.length} chars` } },
     mouse: { move: action, wheel: action, down: action, up: action },
   });
