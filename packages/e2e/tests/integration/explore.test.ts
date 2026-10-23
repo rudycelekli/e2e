@@ -17,6 +17,7 @@ import type { ModelInstance } from '../../src/types.ts';
 import { installFakeLoopModel, loopCalls, nodeIdFor, type LoopCall, type LoopToolCall } from '../helpers/fake-loop-model.ts';
 import { extracted, fakeCalls, installFakeModel, type FakeCall } from '../helpers/fake-model.ts';
 import { startFixtureApp, type FixtureApp } from '../helpers/fixture-app.ts';
+import { createFakeEngine } from '../helpers/fake-engine.ts';
 import { assertValidReport } from '../helpers/report-schema.ts';
 import { createProject, type FixtureProject } from '../helpers/run-project.ts';
 import { web } from '@e2e-dev/web';
@@ -200,8 +201,8 @@ describe('e2e explore', () => {
     expect(result.attempts[0]!.steps.map((step) => step.api)).toEqual(['app.open', 'agent.extract', 'agent.act', 'agent.extract']);
     // The explorer's loop saw the finding tool beside the grammar.
     expect(loopCalls[0]!.toolNames).toContain(FINDING_TOOL_NAME);
-    // The planner's calls carried the goal as trusted context.
-    expect(fakeCalls[0]!.system).toContain('Exploration goal: Explore the home page and find bugs');
+    // The planner's prompts opened with the goal, the test's title.
+    expect(fakeCalls[0]!.prompt).toContain('Test: Explore the home page and find bugs');
     // The written report is the outcome's document.
     const written = JSON.parse(readFileSync(path.join(project.dir, '.e2e', 'report.json'), 'utf8')) as typeof outcome.report;
     expect(written.run.explore).toEqual(record);
@@ -258,10 +259,10 @@ describe('e2e explore', () => {
     const result = outcome.report.run.results[0]!;
     expect(result.titlePath).toEqual(['Explore the home page with key <secret:probe>']);
     expect(outcome.report.run.explore!.goal).toBe('Explore the home page with key <secret:probe>');
-    expect(fakeCalls[0]!.system).toContain('Exploration goal: Explore the home page with key <secret:probe>');
-    // The explorer's loop ran, carrying the goal as context.
+    expect(fakeCalls[0]!.prompt).toContain('Test: Explore the home page with key <secret:probe>');
+    // The explorer's loop ran, its prompt opening with the goal.
     expect(loopCalls.length).toBeGreaterThan(0);
-    expect(loopCalls[0]!.system).toContain('Exploration goal: Explore the home page with key <secret:probe>');
+    expect(loopCalls[0]!.prompt).toContain('Test: Explore the home page with key <secret:probe>');
     const paths = result.attempts[0]!.artifacts.map((artifact) => artifact.path ?? '');
     expect(paths.some((entry) => entry.startsWith('explore-the-home-page-with-key-secret-'))).toBe(true);
     expect(JSON.stringify([outcome.report, fakeCalls, loopCalls])).not.toContain(value);
@@ -364,6 +365,26 @@ describe('e2e explore', () => {
       code: 'UNKNOWN_TARGET',
       message: /unknown target ID "nope"; the config declares "web"/,
     });
+  }, 120_000);
+
+  it("launches a device target's pinned app before the planner's first look", async () => {
+    const model = installExploreModel({
+      plan: () => ({ decision: 'finish', summary: 'Looked around.' }),
+      loop: () => [{ toolName: 'complete_step', input: { status: 'passed', summary: 'unused' } }],
+    });
+    const fake = createFakeEngine({ device: true, scene: () => [{ id: 'greet', role: 'button', name: 'Greet' }] });
+    const outcome = await explore({
+      cwd: project.dir,
+      rawConfig: { targets: [{ name: 'device', platform: 'ios', engine: fake.engine, app: {} }] as never, agents: { default: { model } } },
+      goal: 'Look around',
+      maxSteps: 1,
+      timeoutMs: 180_000,
+      notice: () => {},
+    });
+    expect(outcome.report.run.results[0]!.attempts[0]!.steps.map((step) => step.api)).toEqual(['app.open', 'agent.extract']);
+    const methods = fake.operations.map((operation) => operation.method);
+    expect(methods.indexOf('session.restart')).toBeGreaterThan(-1);
+    expect(methods.indexOf('session.restart')).toBeLessThan(methods.indexOf('observe'));
   }, 120_000);
 
   it('runs as the agent --agent names, built from it, keeps the other agents, and rejects an unknown name before anything starts', async () => {
@@ -651,7 +672,8 @@ test('never runs under explore', async () => {
     expect(setupCalls.length).toBeGreaterThan(0);
     for (const call of setupCalls) {
       expect(call.system).not.toContain('Exploration mode');
-      expect(call.system).not.toContain('Exploration goal');
+      expect(call.system).not.toContain('Explore the storage page');
+      expect(call.prompt).not.toContain('Explore the storage page');
       expect(call.toolNames).not.toContain(FINDING_TOOL_NAME);
     }
     expect(outcome.explore.findings).toEqual([]);

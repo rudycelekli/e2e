@@ -187,7 +187,7 @@ describe('failedStepOutcome', () => {
     for (const code of ['CANCELLED', 'MODEL_PROVIDER_FAILED', 'MODEL_UNAVAILABLE'] as const) {
       expect(failedStepOutcome(new AgentError(code, 'x'))).toBe('no-verdict');
     }
-    for (const code of ['ASSERTION_FAILED', 'STEP_TIMEOUT', 'MODEL_OUTPUT_INVALID', 'CONTEXT_OVERFLOW', 'APP_UNREACHABLE'] as const) {
+    for (const code of ['ASSERTION_FAILED', 'STEP_TIMEOUT', 'MODEL_OUTPUT_INVALID', 'CONTEXT_OVERFLOW', 'APP_UNREACHABLE', 'MODEL_REFUSED'] as const) {
       expect(failedStepOutcome(new AgentError(code, 'x'))).toBe('failed');
     }
     expect(failedStepOutcome(new Error('MODEL_PROVIDER_FAILED'))).toBe('failed');
@@ -691,6 +691,18 @@ describe('StepTraceSession', () => {
       expect(deleted).toEqual(expected);
       expect(context.staged.filter((entry) => entry.kind !== 'decided')).toHaveLength(0);
     }
+  });
+
+  it('does not stage an eviction outcome when deleting a consumed entry rejects', async () => {
+    const context = entryContext({ endPath: '/customers', endAnchors: [savedAnchor] });
+    context.store.delete = async () => { throw new Error('store unavailable'); };
+    const session = makeSession(context, makeHost(['/pricing', '/customers']));
+    await session.begin();
+    expect(session.replayedPrefix?.stopReason).toBe('end-mismatch');
+    await expect(session.conclude('failed', undefined)).resolves.toBeUndefined();
+    expect(context.staged).toEqual([]);
+    const writes = await settleStagedTraces(context, { lastVerifiedStepIndex: -1, implicatesUnconfirmed: true });
+    expect(writes.size).toBe(0);
   });
 
   it('evicts nothing on failure when no replay was consumed', async () => {
