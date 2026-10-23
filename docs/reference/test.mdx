@@ -507,7 +507,7 @@ describe('checkout', { serial: true }, () => {
   skip with cause `serial-predecessor-failed`. When the run is interrupted
   during the launch, every member skips instead.
 - If a retry is interrupted or never reaches its members, they keep the
-  verdicts and durations of the last non-cut attempt.
+  verdicts and durations of the last attempt that was not cut.
 - The exit code follows the error's category, as for any other test.
 
 | Throws | When |

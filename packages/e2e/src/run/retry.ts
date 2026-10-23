@@ -3,7 +3,11 @@
 import type { SerializedError } from '../internal/errors.ts';
 import type { AttemptStatus, ResultStatus, SerialAttemptRecord } from './records.ts';
 
-/** A retry keeps earlier member verdicts if interrupted or if it never reached its members. */
+/**
+ * Whether a retry's member records are not the verdict. True when the retry
+ * was interrupted, including after members ran (`reachedMembers` true), or
+ * when it never reached its members.
+ */
 export function isCutSerialRetry(status: SerialAttemptRecord['status'], index: number, reachedMembers: boolean): boolean {
   return index > 0 && (status === 'interrupted' || !reachedMembers);
 }

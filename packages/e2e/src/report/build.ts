@@ -237,7 +237,10 @@ export interface ReportSerialMember {
 
 export interface ReportSerialAttempt extends ReportAttemptBase {
   status: SerialAttemptRecord['status'];
-  /** The retry was cut before it reached its members, so their verdicts come from an earlier attempt. Absent in older reports. */
+  /**
+   * The retry was interrupted, or it never reached its members, so this
+   * attempt's member records are not the verdict. Absent in older reports.
+   */
   cutRetry?: boolean;
   members: readonly ReportSerialMember[];
 }

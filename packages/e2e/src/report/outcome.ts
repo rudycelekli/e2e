@@ -19,7 +19,7 @@ export interface AttemptView {
   readonly status: ReportResult['attempts'][number]['status'] | 'skipped';
   /** How long the attempt ran; for a serial member, the member's own part of it. */
   readonly durationMs: number;
-  /** A serial retry cut before it reached its members: it never stands for their verdict. */
+  /** This attempt's member records are not the verdict: the retry was interrupted, or it never reached its members. */
   readonly cut: boolean;
   readonly error: ReportError | undefined;
   readonly steps: readonly ReportStep[];
