@@ -82,12 +82,12 @@ describe.each<BrowserProviderScope>(['worker', 'attempt'])('downloads through a 
     const page = surfaceOf(engine)!.page();
     await page.evaluate((downloadCount) => {
       for (let index = 0; index < downloadCount; index += 1) {
-      const link = document.createElement('a');
-      link.href = URL.createObjectURL(new Blob([`report body ${index}`]));
-      link.download = `report-${index}.txt`;
-      link.id = `download-${index}`;
-      link.textContent = 'Download';
-      document.body.append(link);
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(new Blob([`report body ${index}`]));
+        link.download = `report-${index}.txt`;
+        link.id = `download-${index}`;
+        link.textContent = 'Download';
+        document.body.append(link);
       }
     }, count);
     const attached: string[] = [];

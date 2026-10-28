@@ -326,12 +326,11 @@ async function collectDownloads(
   const operation = context.operation(timeout);
   const waitMs = operation.timeoutMs;
   const deadline = new Deadline(waitMs);
-  const saving = new AbortController();
-  const signal = AbortSignal.any([operation.signal, saving.signal]);
+  const scope = new AbortController();
+  const signal = AbortSignal.any([operation.signal, scope.signal]);
   const started: Download[] = [];
   let triggerFailure: { cause: unknown } | undefined;
   let triggerMs: number | undefined;
-  let closed = false;
   let finished = false;
   let stopListening = (): void => {};
   const timedOut = (): TestError => new TestError(
@@ -343,7 +342,7 @@ async function collectDownloads(
         : `${count === 1 ? 'the download' : `${count} downloads`} did not finish within ${waitMs}ms`,
   );
   const requireOpen = (): void => {
-    if (closed || deadline.expired()) throw timedOut();
+    if (scope.signal.aborted || deadline.expired()) throw timedOut();
   };
   try {
     return await withTimeout(surface.guard({ ...operation, signal }, 'download', async (currentOperation) => {
@@ -355,7 +354,7 @@ async function collectDownloads(
       let allStarted!: () => void;
       const received = new Promise<void>((resolve) => { allStarted = resolve; });
       const onDownload = (download: Download): void => {
-        if (closed || started.length === count) return;
+        if (scope.signal.aborted || started.length === count) return;
         started.push(download);
         if (started.length === count) allStarted();
       };
@@ -369,17 +368,13 @@ async function collectDownloads(
         throw cause;
       }
       triggerMs = Date.now() - triggerStart;
-      requireOpen();
       await raceAbort(received, currentOperation.signal, 'download');
-      requireOpen();
       const files: DownloadedFile[] = [];
       for (const download of started) {
-        requireOpen();
         const suggestedFilename = download.suggestedFilename();
         const { relative, absolute } = surface.artifactPath('downloads', suggestedFilename, '');
         if (remote === undefined) await saveLocally(download, absolute, surface.unservedDownloads());
         else await saveFromBrowser(download, remote, absolute, currentOperation.signal);
-        requireOpen();
         if (currentOperation.signal.aborted) throw timedOut();
         context.attachArtifact('download', relative);
         files.push({ path: relative, absolutePath: absolute, suggestedFilename });
@@ -393,10 +388,9 @@ async function collectDownloads(
     }, 'test-code'), deadline.remaining(), timedOut);
   } finally {
     // The owner closes even when a trigger never settles; late work cannot attach artifacts.
-    closed = true;
+    scope.abort();
     stopListening();
     if (!finished) {
-      saving.abort();
       for (const download of started) void download.cancel().catch(() => undefined);
     }
   }

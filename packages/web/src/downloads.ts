@@ -22,20 +22,16 @@ const browserSessions = new WeakMap<Browser, Promise<CDPSession>>();
  * download events Playwright's waiter reads left on.
  */
 export async function saveDownloadsTo(page: Page, dir: string, signal?: AbortSignal): Promise<void> {
-  signal?.throwIfAborted();
   const context = page.context();
   const browser = context.browser();
   if (browser === null) throw invalidState('the page has no browser to set a download directory on');
   const pageSession = await context.newCDPSession(page);
   let browserContextId: string | undefined;
   try {
-    signal?.throwIfAborted();
     ({ targetInfo: { browserContextId } } = await pageSession.send('Target.getTargetInfo'));
-    signal?.throwIfAborted();
   } finally {
     await pageSession.detach().catch(() => undefined);
   }
-  signal?.throwIfAborted();
   let session = browserSessions.get(browser);
   if (session === undefined) {
     session = browser.newBrowserCDPSession();
