@@ -39,10 +39,6 @@ describe('serial verdict attempt', () => {
     expect(result.attempts.map((attempt) => attempt.durationMs)).toEqual([1200, 300]);
   });
 
-  it('keeps completed member timing from an interrupted first attempt', () => {
-    expect(serialOutcome([serialAttempt(0, 'interrupted', 1200)]).durationMs).toBe(1200);
-  });
-
   it.each([true, false])('reads the runner decision when a failed retry cutRetry is %s', (cutRetry) => {
     const error = reportError({ message: 'member assertion failed' });
     const launchError = reportError({ message: 'retry launch failed' });

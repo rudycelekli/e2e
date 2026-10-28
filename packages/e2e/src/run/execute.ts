@@ -73,7 +73,7 @@ export interface ExecutionEvents {
   /** One member that finished in a serial group attempt, ahead of the group. */
   onSerialMember?(groupId: string, attempt: SerialAttemptStart, member: SerialMemberRecord): void;
   /** One finished serial group attempt, ahead of the group. */
-  onSerialAttempt?(groupId: string, run: SerialAttemptRecord): void;
+  onSerialAttempt?(groupId: string, attempt: SerialAttemptRecord): void;
   /** Fires before a runnable pair starts; a serial unit announces each member as it begins. */
   onPairStart?(pair: TestTargetPair): void;
   /** Live step progress of one running attempt, for reporters. */
@@ -246,8 +246,8 @@ export class TargetExecutor implements SerialHost {
   }
 
   /** Streams one finished serial group attempt (SerialHost). */
-  serialAttemptFinished(groupId: string, run: SerialAttemptRecord): void {
-    this.options.events?.onSerialAttempt?.(groupId, run);
+  serialAttemptFinished(groupId: string, attempt: SerialAttemptRecord): void {
+    this.options.events?.onSerialAttempt?.(groupId, attempt);
   }
 
   /** Builds one engine operation context. */

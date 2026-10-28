@@ -328,7 +328,7 @@ class FakeRunner implements UnitRunner {
           this.events.onMessage({ type: 'pair-start', testId: pair.test.id, agent: pair.agent, repeat: pair.repeat, title: pair.test.id, file: pair.test.file, serialId: pair.test.serialId });
           this.events.onMessage({ type: 'serial-member', groupId, attempt: finishedRun, member });
         }
-        this.events.onMessage({ type: 'serial-attempt', groupId, run: finishedRun });
+        this.events.onMessage({ type: 'serial-attempt', groupId, attempt: finishedRun });
       }
       const partial = this.behaviour.serialMembersBeforeHang ?? [];
       if (partial.length > 0) {

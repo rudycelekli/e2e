@@ -277,7 +277,7 @@ export interface SerialAttemptMessage {
   readonly type: 'serial-attempt';
   /** The group's report id (`SerialGroupRecord.id`). */
   readonly groupId: string;
-  readonly run: SerialAttemptRecord;
+  readonly attempt: SerialAttemptRecord;
 }
 
 export interface UnitDoneMessage {
