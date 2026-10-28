@@ -17,9 +17,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import type { Page } from 'playwright-core';
 import { TestError, type EngineFixtureContext } from 'e2e/engine';
 import { PlaywrightSurface } from '../../src/surface.ts';
-import type { Browser, WebRoute } from '../../src/browser.ts';
-const browserModule = '../../dist/browser.js';
-const { createBrowserFixture } = await import(browserModule) as typeof import('../../src/browser.ts');
+import { createBrowserFixture, type Browser, type WebRoute } from '../../src/browser.ts';
 import { ignoreTrace, noSecrets } from '../helpers/secrets.ts';
 
 interface Echo {
@@ -175,9 +173,9 @@ describe('browser.route decisions', () => {
         expect(upstream.status).toBe(200);
         expect(upstream.url).toBe(`${origin}/echo`);
         expect(upstream.headers['content-type']).toContain('application/json');
-        await expect(upstream.text()).rejects.toMatchObject({code:'ACTION_FAILED', message:expect.stringContaining('route.fetch')});
-        await expect(upstream.json()).rejects.toMatchObject({code:'ACTION_FAILED'});
-        await route.fulfill({body:'safe fallback'});
+        await expect(upstream.text()).rejects.toMatchObject({ code: 'ACTION_FAILED', message: expect.stringContaining('route.fetch') });
+        await expect(upstream.json()).rejects.toMatchObject({ code: 'ACTION_FAILED' });
+        await route.fulfill({ body: 'safe fallback' });
       });
       expect(await fetchText(`${origin}/echo`)).toBe('safe fallback');
       expect(hits.get('/echo')).toBe(1);

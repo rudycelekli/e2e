@@ -12,7 +12,7 @@
  * says which URLs a test may open.
  */
 
-import type { Download, Response, Route } from 'playwright-core';
+import type { Download, Route } from 'playwright-core';
 import type { ActionOptions, Expectable, JsonValue, Locator, Screen, TextMatch } from 'e2e';
 import {
   ConfigurationError,
@@ -115,21 +115,24 @@ export interface WebResponse {
  * that arrived decodes to text on every call, a body the browser could not
  * read rejects every call with `ACTION_FAILED` naming the cause. Swallowing
  * that failure would hand the test an empty string the server never sent,
- * indistinguishable from a real empty body. The browser reports the reason
- * on the request (`net::ERR_CONTENT_LENGTH_MISMATCH` for a connection cut
- * short of the declared length, `net::ERR_ABORTED` for a request the page
- * aborted), and the protocol error behind the read is the fallback, as for a
- * redirect, whose body the browser never keeps.
+ * indistinguishable from a real empty body. `failure` names the reason the
+ * browser reported on a page request (`net::ERR_CONTENT_LENGTH_MISMATCH` for
+ * a connection cut short of the declared length, `net::ERR_ABORTED` for a
+ * request the page aborted), and the error behind the read is the fallback,
+ * as for a redirect, whose body the browser never keeps.
  */
-async function readResponseBody(response: Response): Promise<() => Promise<string>> {
+async function readResponseBody(
+  api: 'waitForResponse' | 'route.fetch',
+  body: () => Promise<Buffer>,
+  failure: () => string | undefined = () => undefined,
+): Promise<() => Promise<string>> {
   try {
-    const text = new TextDecoder().decode(await response.body());
+    const text = new TextDecoder().decode(await body());
     return () => Promise.resolve(text);
   } catch (cause) {
-    const reason = response.request().failure()?.errorText ?? causeMessage(cause);
     const error = new TestError(
       'ACTION_FAILED',
-      `waitForResponse: response body could not be read: ${reason}`,
+      `${api}: response body could not be read: ${failure() ?? causeMessage(cause)}`,
     );
     return () => Promise.reject(error);
   }
@@ -444,14 +447,7 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
                 maxRedirects: 0,
               });
               try {
-                let text: () => Promise<string>;
-                try {
-                  const body = await response.text();
-                  text = () => Promise.resolve(body);
-                } catch (cause) {
-                  const error = new TestError('ACTION_FAILED', `route.fetch: response body could not be read: ${causeMessage(cause)}`);
-                  text = () => Promise.reject(error);
-                }
+                const text = await readResponseBody('route.fetch', () => response.body());
                 return {
                   url: response.url(),
                   status: response.status(),
@@ -545,7 +541,7 @@ export function createBrowserFixture(surface: PlaywrightSurface, context: Engine
         // only by `text` and `json` on a budget of their own: the timeout
         // bounds the match, never a body still streaming in behind headers
         // that already arrived.
-        const body = readResponseBody(response);
+        const body = readResponseBody('waitForResponse', () => response.body(), () => response.request().failure()?.errorText);
         const text = async (): Promise<string> => {
           const { signal, timeoutMs } = context.operation();
           const read = await raceAbort(
