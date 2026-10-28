@@ -22,8 +22,9 @@ npx e2e login|logout|models [provider]  # e2e/oauth subscription logins: openai,
                                    # github-copilot, opencode-console, spacexai
 npx e2e mcp [--target <name>]      # MCP server for a coding agent (topic mcp)
 npx e2e upgrade [version|tag]      # e2e and its @e2e-dev packages to latest or a version;
-                                   # alias update, --dry-run shows the plan; an e2e
-                                   # without the command: npx e2e@latest upgrade
+                                   # alias update, --dry-run shows the plan; updates
+                                   # this skill's copies too; an e2e without the
+                                   # command: npx e2e@latest upgrade
 npx e2e feedback -m <text> [opts]  # report a problem with e2e itself
 npx e2e telemetry [disable|enable] # anonymous usage telemetry: status or switch
 ```
@@ -48,7 +49,7 @@ npx e2e telemetry [disable|enable] # anonymous usage telemetry: status or switch
 | `--max-failures <n>` | Stop after n failures: the rest skip (cause `failure-limit`), running tests end `interrupted`; exit 1. |
 | `--max-duration <ms>` | Stop after ms of running tests, over config `maxDuration`: the rest skip (cause `time-limit`), running tests end `interrupted`, `RUN_TIMEOUT`; exit 1. |
 | `--repeat-each <n>` | Run every selected test n times, each run its own result (`repeat` 0 through n-1); add `--no-cache` or later runs replay the first's recording. The `Repeats` summary row names each unstable test's failed runs. |
-| `--reporter <ids>` | `list`, `json`, `junit`, `markdown`, comma-separated; `json` cannot combine with `list`. |
+| `--reporter <ids>` | `list`, `json`, `junit`, `markdown`, comma-separated; `json` cannot combine with `list`. An empty value is a usage error, exit 2. |
 | `--output <dir>` | Results directory, over the config's `output` (default `.e2e`). |
 | `--no-cache` | Replay cache off for this run. |
 | `--strict-cache` | Fail a step whose committed recording no longer replays (`REPLAY_STALE`, exit 2) instead of handing it to the agent; retries replay too, and the run never writes the cache. |
